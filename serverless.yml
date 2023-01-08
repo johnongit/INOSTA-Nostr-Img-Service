@@ -1,0 +1,98 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: nostr-image-services
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: eu-west-1
+  timeout: 29
+  # HTTP Api gateway
+  httpApi:
+    cors: true
+  environment:
+    S3_BUCKET: { Ref: S3Bucket }
+    DYNAMODB_TABLE: ${self:service}
+    LNBITS_HOST: ${self:custom.LNBITS_HOST}
+    LNBITS_API_INVOICE_KEY: ${self:custom.LNBITS_API_INVOICE_KEY}
+  iamRoleStatements: # Signed URL will have same permissions as the IAM Role
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
+
+
+custom: 
+  ${file(./variables.yml)}
+
+
+
+functions:
+  getPresignedUrl:
+    handler: handler-getSignedUrl.getPresignedUrl
+    logRetentionInDays: 3
+    events: 
+      - httpApi:
+          path: /getSignedUrl
+          method: POST
+  getInvoice:
+    handler: handler-getInvoice.getInvoice
+    logRetentionInDays: 3
+    events: 
+      - httpApi:
+          path: /getInvoice
+          method: GET
+
+   
+
+resources:
+  Resources:
+# create dynamoDB table
+    PaymentHashTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}
+        AttributeDefinitions:
+          - AttributeName: payment_hash
+            AttributeType: S
+          - AttributeName: date
+            AttributeType: S
+        KeySchema:
+          - AttributeName: payment_hash
+            KeyType: HASH
+          - AttributeName: date
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+    S3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, POST, PUT]
+              AllowedOrigins: ['*']
+    S3BucketPolicy: # Allow uploaded files to be public and downloadable
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: { Ref: S3Bucket }
+        PolicyDocument:
+          Statement:
+            - Action:
+                - 's3:GetObject'
+              Effect: 'Allow'
+              Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
+              Principal: '*'
