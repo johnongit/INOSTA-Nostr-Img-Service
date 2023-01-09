@@ -121,10 +121,21 @@ module.exports.getPresignedUrl = async function(event, context, callback) {
 
     const data = await requestPromise;
     const responseData = JSON.parse(data);
-          
+
+    presigned_url = await getPresignedUrl(filename);
+    //if presigned is false return error
+    if (!presigned_url) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: false,
+          message: 'Error getting presigned url'
+        })
+      }
+    }
     if (responseData.paid) {
       console.log("in paid")
-      presigned_url = await getPresignedUrl(filename);
+      
       const deleteStatus = await deletePresignedUrl(payment_hash, date)
       console.log("deleteStatus " + deleteStatus)
       console.log("presigned_url " + presigned_url )

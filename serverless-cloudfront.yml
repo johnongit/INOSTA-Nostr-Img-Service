@@ -11,19 +11,17 @@
 #
 # Happy Coding!
 
-service: nostr-image-services
+service: cf-nostr-image-services
 
 provider:
   name: aws
   runtime: nodejs16.x
-  region: eu-west-1
-  architecture: arm64
+  region: us-east-1
+  architecture: x86_64
   timeout: 29
-  # HTTP Api gateway
-  httpApi:
-    cors: true
   environment:
-    S3_BUCKET: { Ref: S3Bucket }
+    S3_BUCKET_CF: ${self:custom.S3_BUCKET_CF}
+    S3_BUCKET: ${self:custom.S3_BUCKET}
     DYNAMODB_TABLE: ${self:service}
     LNBITS_HOST: ${self:custom.LNBITS_HOST}
     LNBITS_API_INVOICE_KEY: ${self:custom.LNBITS_API_INVOICE_KEY}
@@ -32,85 +30,45 @@ provider:
       Action:
         - s3:PutObject
       Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
-    - Effect: Allow
-      Action:
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:GetItem
-        - dynamodb:DeleteItem
-      Resource: { "Fn::GetAtt": [PaymentHashTable, Arn] }
-
 
 custom:
-  cdn:
-    # Indicates which CloudFormation region deployment used to provision CloudFront (because you only need to provision CloudFront once)
-    region: us-east-1
   LNBITS_HOST: ${file(./variables.yml):LNBITS_HOST}
   LNBITS_API_INVOICE_KEY: ${file(./variables.yml):LNBITS_API_INVOICE_KEY}
-
-
-	
-plugins:
-  - serverless-multi-region-plugin
+  S3_BUCKET_CF: ${file(./variables.yml):S3_BUCKET_CF}
+  S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
 
 package:
   individually: true
   patterns:
     - '!serverless.yml'
+    - '!serverless-cloudfront.yml'
     - '!variables.sample.yml'
     - '!variables.yml'
   
 
+
+   
 functions:
-  getPresignedUrl:
-    handler: lambda/handler-getSignedUrl.getPresignedUrl
+  checkUploadedFileCf:
+    handler: lambda/handler-checkUploadedFile.checkUploadedFile
     logRetentionInDays: 3
     package:
       patterns:
         - '!lambda/**'
-        - lambda/handler-getSignedUrl.js    
+        - lambda/handler-checkUploadedFile.js
     events: 
-      - httpApi:
-          path: /getSignedUrl
-          method: POST
-  getInvoice:
-    handler: lambda/handler-getInvoice.getInvoice
-    logRetentionInDays: 3
-    package:
-      patterns:
-          - '!lambda/**'
-          - lambda/handler-getInvoice.js    
-    events: 
-      - httpApi:
-          path: /getInvoice
-          method: GET
-
-   
+      - cloudFront:
+          eventType: viewer-request
+          origin: ${self:custom.S3_BUCKET_CF}
+          includeBody: true
+          pathPattern:  /*
 
 resources:
   Resources:
-# create dynamoDB table
-    PaymentHashTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}
-        AttributeDefinitions:
-          - AttributeName: payment_hash
-            AttributeType: S
-          - AttributeName: date
-            AttributeType: S
-        KeySchema:
-          - AttributeName: payment_hash
-            KeyType: HASH
-          - AttributeName: date
-            KeyType: RANGE
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
     S3Bucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: ${self:service}
+        BucketName: ${self:custom.S3_BUCKET}
         CorsConfiguration:
           CorsRules:
             - AllowedHeaders: ['*']
