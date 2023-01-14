@@ -40,10 +40,10 @@
 
 **Utilisation**: doit être appelé périodiquement (5 secondes ?) par le client après la requête *getInvoice()* pour vérifier si l'invoice a été payée
 
-**Paramètres**:
+**Paramètres**: à ajouter en body http
 ```
 {
-    payment_hash: <payment_hash> (string),
+    payment-hash: <payment_hash> (string),
     date: "date" (string)
 }
 ```
@@ -72,10 +72,10 @@
 
 **Utilisation**: doit être appelé par le client pour uploader un fichier
 
-**Paramètres**: A passer en plus avec le fichier uploadé
+**Paramètres**: A passer en entête en plus avec le fichier uploadé
 ```
 {
-    payment_hash: <payment_hash> (string),
+    payment-hash: <payment_hash> (string),
     date: "date" (string)
 }
 ```
