@@ -110,7 +110,7 @@ module.exports.getPresignedUrl = async function(event, context, callback) {
     console.log("body " + body)
     const bodyJson = JSON.parse(body);
     console.log("bodyJson " + bodyJson)
-    const payment_hash = bodyJson.payment_hash;
+    const payment_hash = bodyJson["payment-hash"];
     const filename = bodyJson.filename;
     const date = bodyJson.date;
     console.log("date " + date)
