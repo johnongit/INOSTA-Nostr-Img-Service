@@ -11,7 +11,7 @@
 #
 # Happy Coding!
 
-service: cf-nostr-image-services
+service: cf2-nostr-image-services
 
 provider:
   name: aws
@@ -19,23 +19,11 @@ provider:
   region: us-east-1
   architecture: x86_64
   timeout: 29
-  environment:
-    S3_BUCKET_CF: ${self:custom.S3_BUCKET_CF}
-    S3_BUCKET: ${self:custom.S3_BUCKET}
-    DYNAMODB_TABLE: ${self:service}
-    LNBITS_HOST: ${self:custom.LNBITS_HOST}
-    LNBITS_API_INVOICE_KEY: ${self:custom.LNBITS_API_INVOICE_KEY}
-  iamRoleStatements: # Signed URL will have same permissions as the IAM Role
-    - Effect: Allow
-      Action:
-        - s3:PutObject
-      Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
+  #environment:
+  #  S3_BUCKET_CF: { Ref: S3Bucket }
+  #  S3_BUCKET_CF_URL: { GetAtt: [S3Bucket, DomainName] }
+    #S3_BUCKET_CF_URL: { Ref: S3Bucket } ".s3.amazonaws.com"
 
-custom:
-  LNBITS_HOST: ${file(./variables.yml):LNBITS_HOST}
-  LNBITS_API_INVOICE_KEY: ${file(./variables.yml):LNBITS_API_INVOICE_KEY}
-  S3_BUCKET_CF: ${file(./variables.yml):S3_BUCKET_CF}
-  S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
 
 package:
   individually: true
@@ -45,35 +33,58 @@ package:
     - '!variables.sample.yml'
     - '!variables.yml'
   
+custom:
+  S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
 
-
-   
 functions:
-  checkUploadedFileCf:
-    handler: lambda/handler-checkUploadedFile.checkUploadedFile
-    logRetentionInDays: 3
-    package:
-      patterns:
-        - '!lambda/**'
-        - lambda/handler-checkUploadedFile.js
-    events: 
-      - cloudFront:
-          eventType: viewer-request
-          origin: ${self:custom.S3_BUCKET_CF}
-          includeBody: true
-          pathPattern:  /*
+  html:
+    handler: index.html
+    events:
+      - http:
+          path: /
+          method: get
+          cors: true
+
 
 resources:
   Resources:
+    CloudFrontOriginIdentity:
+      Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+      Properties:
+        CloudFrontOriginAccessIdentityConfig:
+          Comment: 'origin identity'
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+          DistributionConfig:
+            PriceClass: PriceClass_100
+            Enabled: true
+            Origins:
+              - DomainName: !GetAtt S3Bucket.DomainName
+                Id: { Ref: S3Bucket }
+                S3OriginConfig:
+                  OriginAccessIdentity: !Join
+                    - ''
+                    - - origin-access-identity/cloudfront/
+                      - !Ref CloudFrontOriginIdentity
+          
+            DefaultCacheBehavior:
+              TargetOriginId: { Ref: S3Bucket }
+              CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+              ForwardedValues:
+                QueryString: false
+                Cookies:
+                  Forward: none
+              AllowedMethods:
+                - GET
+                - HEAD
+              ViewerProtocolPolicy: redirect-to-https
+      
+              
     S3Bucket:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.S3_BUCKET}
-        CorsConfiguration:
-          CorsRules:
-            - AllowedHeaders: ['*']
-              AllowedMethods: [GET, POST, PUT]
-              AllowedOrigins: ['*']
     S3BucketPolicy: # Allow uploaded files to be public and downloadable
       Type: AWS::S3::BucketPolicy
       Properties:
@@ -84,4 +95,23 @@ resources:
                 - 's3:GetObject'
               Effect: 'Allow'
               Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
-              Principal: '*'
+              Principal: 
+                AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginIdentity}'
+  Outputs:
+    S3Bucket:
+      Value: { Ref: S3Bucket }
+      Export:
+        Name: S3Bucket
+    CloudFrontDistribution:
+      Value: { Ref: CloudFrontDistribution }
+      Export:
+        Name: CloudFrontDistribution
+      # export distribution domain name
+    CloudFrontDistributionDomainName:
+      Value: !GetAtt CloudFrontDistribution.DomainName
+      Export:
+        Name: CloudFrontDistributionDomainName
+    CloudFrontOriginIdentity:
+      Value: { Ref: CloudFrontOriginIdentity }
+      Export:
+        Name: CloudFrontOriginIdentity

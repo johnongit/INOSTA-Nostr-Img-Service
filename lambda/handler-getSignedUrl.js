@@ -19,9 +19,9 @@ async function getPresignedUrl(filename)
 
 // create a function that read in dynamoDB and return if presigned url exists
 
-async function checkIfPaymentHashExist(payment_hash, date) {
+async function CheckIfPaymentPaid(payment_hash, date) {
   try {
-    console.log("in checkIfPaymentHashExist " + payment_hash + " " + date)
+    console.log("in CheckIfPaymentPaid " + payment_hash + " " + date)
     const dynamoDB = new AWS.DynamoDB.DocumentClient();
     const params = {
       TableName: process.env.DYNAMODB_TABLE,
@@ -31,16 +31,51 @@ async function checkIfPaymentHashExist(payment_hash, date) {
       },
     };
     const data = await dynamoDB.get(params).promise();
+    console.log(data)
     if (data.Item) {
-      //return data.Item;
+      if(data.Item.paid) {
+        return true
+      }
+      return false
+    }
+    return true;
+  } catch (err) {
+    console.log('Error getting payment hash from DynamoDB:', err);
+    return true;
+  }
+} 
+
+// Update dynamoDB and mark the invoice as paid
+async function updatePaymentHash(payment_hash, date) {
+  try {
+    console.log("in updatePaymentHash " + payment_hash + " " + date)
+    const dynamoDB = new AWS.DynamoDB.DocumentClient();
+    const params = {
+      TableName: process.env.DYNAMODB_TABLE,
+      Key: {
+        payment_hash: payment_hash,
+        date: date
+      },
+      UpdateExpression: "set paid = :p",
+      ExpressionAttributeValues:{
+        ":p":true
+      },
+      ReturnValues:"UPDATED_NEW"
+    };  
+    const data = await dynamoDB.update(params).promise();
+    console.log(data)
+    console.log(typeof data)
+    console.log(data.Attributes.paid)
+    if (data.Attributes.paid) {
       return true
     }
     return false;
   } catch (err) {
-    console.log('Error getting payment hash from DynamoDB:', err);
+    console.log('Error updating payment hash in DynamoDB:', err);
     return false;
   }
-} 
+}
+
 
 // Create a function that delete a presigned url from dynamoDB
 async function deletePresignedUrl(payment_hash, date) {
@@ -55,6 +90,7 @@ async function deletePresignedUrl(payment_hash, date) {
       },
     };
     const data = await dynamoDB.delete(params).promise();
+    console.log(data)
     if (data.Item) {
       return true
     }
@@ -77,9 +113,11 @@ module.exports.getPresignedUrl = async function(event, context, callback) {
     const payment_hash = bodyJson.payment_hash;
     const filename = bodyJson.filename;
     const date = bodyJson.date;
-    const paymentExist = await checkIfPaymentHashExist(payment_hash, date)
-    console.log(paymentExist)
-    if (!paymentExist) {
+    console.log("date " + date)
+    const paymentPaid = await CheckIfPaymentPaid(payment_hash, date)
+
+    console.log(paymentPaid)
+    if (paymentPaid) {
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -122,28 +160,20 @@ module.exports.getPresignedUrl = async function(event, context, callback) {
     const data = await requestPromise;
     const responseData = JSON.parse(data);
 
-    presigned_url = await getPresignedUrl(filename);
-    //if presigned is false return error
-    if (!presigned_url) {
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          success: false,
-          message: 'Error getting presigned url'
-        })
-      }
-    }
+
     if (responseData.paid) {
       console.log("in paid")
-      
+      /*
       const deleteStatus = await deletePresignedUrl(payment_hash, date)
       console.log("deleteStatus " + deleteStatus)
-      console.log("presigned_url " + presigned_url )
+      */
+      const updateStatus = await updatePaymentHash(payment_hash, date)
+      console.log("updateStatus " + updateStatus)
+      
       return {
         statusCode: 200,
         body: JSON.stringify({
-          success: true,
-          presigned: presigned_url
+          success: true
         })
       }
     }

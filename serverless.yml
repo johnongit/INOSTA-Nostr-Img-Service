@@ -23,15 +23,21 @@ provider:
   httpApi:
     cors: true
   environment:
-    S3_BUCKET: { Ref: S3Bucket }
+    S3_BUCKET: ${self:custom.S3_BUCKET}
     DYNAMODB_TABLE: ${self:service}
     LNBITS_HOST: ${self:custom.LNBITS_HOST}
     LNBITS_API_INVOICE_KEY: ${self:custom.LNBITS_API_INVOICE_KEY}
-  iamRoleStatements: # Signed URL will have same permissions as the IAM Role
+    CLOUDFRONT_DOMAIN_NAME: ${self:custom.CLOUDFRONT_DOMAIN_NAME}
+  iamRoleStatements: 
     - Effect: Allow
       Action:
         - s3:PutObject
-      Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
+      Resource:
+        - Fn::Join:
+          - ''
+          - - 'arn:aws:s3:::'
+            - ${self:custom.S3_BUCKET}
+            - '/*'
     - Effect: Allow
       Action:
         - dynamodb:PutItem
@@ -42,16 +48,11 @@ provider:
 
 
 custom:
-  cdn:
-    # Indicates which CloudFormation region deployment used to provision CloudFront (because you only need to provision CloudFront once)
-    region: us-east-1
   LNBITS_HOST: ${file(./variables.yml):LNBITS_HOST}
   LNBITS_API_INVOICE_KEY: ${file(./variables.yml):LNBITS_API_INVOICE_KEY}
-
-
-	
-plugins:
-  - serverless-multi-region-plugin
+  DYNAMODB_TABLE: $file(./variables.yml):DYNAMODB_TABLE}
+  CLOUDFRONT_DOMAIN_NAME: ${file(./variables.yml):CLOUDFRONT_DOMAIN_NAME}
+  S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
 
 package:
   individually: true
@@ -59,36 +60,64 @@ package:
     - '!serverless.yml'
     - '!variables.sample.yml'
     - '!variables.yml'
-  
+
 
 functions:
-  getPresignedUrl:
-    handler: lambda/handler-getSignedUrl.getPresignedUrl
+  checkUploadedFile:
+    handler: lambda/handler-checkUploadedFile.checkUploadedFile
     logRetentionInDays: 3
+    reservedConcurrency: 10
     package:
       patterns:
         - '!lambda/**'
-        - lambda/handler-getSignedUrl.js    
+        - lambda/handler-checkUploadedFile.js
     events: 
+      - httpApi:
+          path: /checkUploadedFile
+          method: POST
+  getPresignedUrl:
+    handler: lambda/handler-getSignedUrl.getPresignedUrl
+    logRetentionInDays: 3
+    reservedConcurrency: 10
+    package:
+      patterns:
+        - '!lambda/**'
+        - lambda/handler-getSignedUrl.js
+    events:
       - httpApi:
           path: /getSignedUrl
           method: POST
   getInvoice:
     handler: lambda/handler-getInvoice.getInvoice
     logRetentionInDays: 3
+    reservedConcurrency: 10
     package:
       patterns:
           - '!lambda/**'
-          - lambda/handler-getInvoice.js    
+          - lambda/handler-getInvoice.js
     events: 
       - httpApi:
           path: /getInvoice
           method: GET
 
-   
-
 resources:
   Resources:
+
+    ApiGatewayStage:
+      Type: AWS::ApiGatewayV2::Stage
+      Properties:
+        StageName: $default
+        DefaultRouteSettings:
+          ThrottlingBurstLimit: 10
+          ThrottlingRateLimit: 10
+        ApiId:
+          Ref: ApiGatewayApi
+    ApiGatewayApi:
+      Type: AWS::ApiGatewayV2::Api
+      Properties:
+        Name: ${self:service}
+        ProtocolType: HTTP
+
 # create dynamoDB table
     PaymentHashTable:
       Type: AWS::DynamoDB::Table
@@ -107,23 +136,4 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
-    S3Bucket:
-      Type: AWS::S3::Bucket
-      Properties:
-        BucketName: ${self:service}
-        CorsConfiguration:
-          CorsRules:
-            - AllowedHeaders: ['*']
-              AllowedMethods: [GET, POST, PUT]
-              AllowedOrigins: ['*']
-    S3BucketPolicy: # Allow uploaded files to be public and downloadable
-      Type: AWS::S3::BucketPolicy
-      Properties:
-        Bucket: { Ref: S3Bucket }
-        PolicyDocument:
-          Statement:
-            - Action:
-                - 's3:GetObject'
-              Effect: 'Allow'
-              Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
-              Principal: '*'
+

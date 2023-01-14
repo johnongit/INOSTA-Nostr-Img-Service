@@ -13,6 +13,7 @@ async function writePaymentHashToDynamoDB(payment_hash, date) {
       Item: {
         payment_hash: payment_hash,
         date: date,
+        paid: false
       },
     };
     const data = await dynamoDB.put(params).promise();
