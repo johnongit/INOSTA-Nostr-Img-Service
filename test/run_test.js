@@ -118,11 +118,9 @@ async function main() {
     }
     // call getInvoice function
     const invoice = await getInvoice();
-    console.log(invoice);
     // if getInvoice return true, then call getSignedUrl function
     if (invoice.status) {
         // display payment_request
-        console.log(invoice.payment_request);
         // convert payment_request to qr code and display it in shell
         qr.generate(invoice.payment_request, {  small: true });
     }
