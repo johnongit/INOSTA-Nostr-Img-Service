@@ -60,8 +60,9 @@ module.exports.getInvoice = async function(event, context, callback) {
       const paymentData = {
         out: false,
         amount: 100,
-        memo: '100',
-        unit: 'sat'
+        memo: 'Nostr Uploader Invoice',
+        unit: 'sat',
+        webhook: process.env.WEBHOOW_URL + '/checkPayment'
       };
 
       req.write(JSON.stringify(paymentData));

@@ -28,6 +28,8 @@ provider:
     LNBITS_HOST: ${self:custom.LNBITS_HOST}
     LNBITS_API_INVOICE_KEY: ${self:custom.LNBITS_API_INVOICE_KEY}
     CLOUDFRONT_DOMAIN_NAME: ${self:custom.CLOUDFRONT_DOMAIN_NAME}
+    WEBHOOW_URL: !GetAtt HttpApi.ApiEndpoint
+    ALLOWED_IP: ${self:custom.ALLOWED_IP}
   iamRoleStatements: 
     - Effect: Allow
       Action:
@@ -53,6 +55,7 @@ custom:
   DYNAMODB_TABLE: $file(./variables.yml):DYNAMODB_TABLE}
   CLOUDFRONT_DOMAIN_NAME: ${file(./variables.yml):CLOUDFRONT_DOMAIN_NAME}
   S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
+  ALLOWED_IP: ${file(./variables.yml):ALLOWED_IP}
 
 package:
   individually: true
@@ -63,6 +66,18 @@ package:
 
 
 functions:
+  checkPayment:
+    handler: lambda/handler-checkPayment.checkPayment
+    logRetentionInDays: 3
+    reservedConcurrency: 10
+    package:
+      patterns:
+        - '!lambda/**'
+        - lambda/handler-checkPayment.js
+    events:
+      - httpApi:
+          path: /checkPayment
+          method: POST
   checkUploadedFile:
     handler: lambda/handler-checkUploadedFile.checkUploadedFile
     logRetentionInDays: 3
@@ -126,13 +141,9 @@ resources:
         AttributeDefinitions:
           - AttributeName: payment_hash
             AttributeType: S
-          - AttributeName: date
-            AttributeType: S
         KeySchema:
           - AttributeName: payment_hash
             KeyType: HASH
-          - AttributeName: date
-            KeyType: RANGE
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5

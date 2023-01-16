@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/run_test.js"
   },
   "repository": {
     "type": "git",
@@ -20,7 +20,8 @@
   },
   "homepage": "https://github.com/johnongit/NostrImgUploader#readme",
   "dependencies": {
-    "lambda-multipart-parser": "^1.0.1"
+    "lambda-multipart-parser": "^1.0.1",
+    "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
     "serverless-plugin-existing-s3": "^2.4.0"

@@ -2,16 +2,15 @@ const AWS = require('aws-sdk');
 const parser = require('lambda-multipart-parser');
 
 
-async function CheckIfPaymentPaid(payment_hash, date) {
+async function CheckIfPaymentPaid(payment_hash) {
     try {
-      console.log("in CheckIfPaymentPaid " + payment_hash + " " + date)
+      console.log("in CheckIfPaymentPaid " + payment_hash)
       console.log(process.env.DYNAMODB_TABLE)
       const dynamoDB = new AWS.DynamoDB.DocumentClient();
       const params = {
         TableName: process.env.DYNAMODB_TABLE,
         Key: {
-          payment_hash: payment_hash,
-          date: date
+          payment_hash: payment_hash
         },
       };
       const data = await dynamoDB.get(params).promise();
@@ -22,7 +21,7 @@ async function CheckIfPaymentPaid(payment_hash, date) {
         }
         return false
       }
-      return true;
+      return false;
     } catch (err) {
       console.log('Error getting payment hash from DynamoDB:', err);
       return true;
@@ -54,7 +53,6 @@ async function PutFileToS3(content, filename, contentType){
 
 // Grab 
 exports.checkUploadedFile = async function(event, context, callback) {
-  console.log('print event 1')
   //console.log(event)
   // get headers
   const headers = event.headers;
@@ -63,27 +61,29 @@ exports.checkUploadedFile = async function(event, context, callback) {
   const eventParsed = await parser.parse(event);
   console.log(headers)
   console.log(body)
-  console.log(headers['payment-hash'] + ' ' + headers['date'])
+  console.log(headers['payment-hash'])
   console.log(eventParsed)
 
   
   // check if payment hash and date headers are present
-  if (!headers['payment-hash'] || !headers['date']) {
-      callback(null, {
-          statusCode: 400,
+  if (!headers['payment-hash']) {
+      return {
+          statusCode: 200,
           body: JSON.stringify({
-              message: 'Missing payment hash or date header'
+              success: false,
+              message: 'Missing payment hash header'
           })
-      });
+      };
   }
   // if body is empty
   if (!eventParsed.files) {
-      callback(null, {
-          statusCode: 400,
+      return {
+          statusCode: 200,
           body: JSON.stringify({
-              message: 'Missing body'
+            success: false,
+            message: 'Missing body'
           })
-      });
+      }
   }
   // decode body from base64
   const decodedBody = Buffer.from(body, 'base64').toString();
@@ -100,29 +100,32 @@ exports.checkUploadedFile = async function(event, context, callback) {
   
   const content = eventParsed.files[0].content
   const payment_hash = headers['payment-hash']
-  const date = headers['date']
-  console.log(payment_hash + ' ' + date)
+  console.log(payment_hash)
   // Check if payment hash is paid
-  const paymentPaid = await CheckIfPaymentPaid(payment_hash, date)
+  const paymentPaid = await CheckIfPaymentPaid(payment_hash)
 
   console.log(paymentPaid)
   if (paymentPaid) {
       // put file to s3
       const fileUploaded = await PutFileToS3(content, filename, contentType)
-      callback(null, {
+      return {
         body: JSON.stringify({
           statusCode: 200,
-          message: 'File Uploaded',
-          url: 'https://' + process.env.CLOUDFRONT_DOMAIN_NAME + '/' + filename
+          body: JSON.stringify({
+            success: true,
+            message: 'File Uploaded',
+            url: 'https://' + process.env.CLOUDFRONT_DOMAIN_NAME + '/' + filename
+          })
         })
-      })
+      }
   }
   else {
-    callback(null, {
+    return {
+      statusCode: 200,
       body: JSON.stringify({
-        statusCode: 400,
+        success: false,
         message: 'Payment not paid'
       })
-    })
+    }
   }
 }
