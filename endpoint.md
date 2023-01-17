@@ -1,114 +1,118 @@
-**- GET** - https://5apaevlc4b.execute-api.eu-west-1.amazonaws.com/getInvoice
+## 1- Endpoint definition
 
-**Définition**: Permet de récupérer une invoice.
+# a. Get invoice
 
-**Utilisation**: doit être appelé par le client pour générer une invoice
+Used to get an invoice from the API
 
-**Paramètres**: Sans paramètre
-
-**Nominal** : Retourne un objet JSON avec les informations suivantes
+*URL*: /getInvoice
+*Method*: GET
+*Parameters*: None
+*Output*: JSON object with the following fields
 ```
 {
     success: true,
     message: 'Invoice generated successfully.',
     payment_hash: <payment_hash> (string),
-    payment_request: <invoice> (string),
-    date: <"date">
+    payment_request: <invoice> (string)
 }
 ```
 
-<payment_request> doit être affiché à l'utilisateur pour qu'il puisse payer l'invoice
+*payment_hash* must be saved by the client to be able to check if the invoice has been paid and to upload the file
+*payment_request* must be displayed to the user to be able to pay the invoice (can be copied converted to QR code)
 
-<payment_hash> doit sauvegardé par le client pour pouvoir vérifier si l'invoice a été payée et pour uploadé le fichier
-
-<"date"> doit être sauvegardé par le client pour pouvoir vérifier si l'invoice a été payée et pour uploadé le fichier
-
-**Exemple:**
-
-> curl https://5apaevlc4b.execute-api.eu-west-1.amazonaws.com/getInvoice
-
-> {"success":true,"message":"Invoice generated successfully.","payment_hash":"3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348","payment_request":"lnbc1u1p3u833mpp5xssdygvnvgc9p42qnq4ndcvyfrk8tpnyd0h462f7cydeqg3mkdrsdq9xycrqsp59uy0rmde2qe4kcstvgxwugnr2qxgv7pzgwh9jvhcneeaazz2uhzsxqy9gcqcqzys9qrsgqrzjqv5mk8udss3k4uhm2s3urp2dr4ejequpwmq20czjs605rskl68rzwy2ty3x9af75xyqqqqlgqqqq86qq3udg2j83nmgczshtuhy6wt6vu9zrugqugwzwdq7dd0pcneurzkfz68q8jk58khz034j8ele2jwza8meu3ecp73wp2vwzgzdj2exg3zxuqpd5rw93","date":"2023-01-15T09:24:12.654Z"}
-
-**Gestion erreur**: L'api doit retourner un code http 200 (sauf si elle plante complètement)
+*Error*: The API must return a 200 http code (except if it completely crashes)
 ```
 {
     success: false,
-    message: <message d'erreur>
+    message: <error message>
 }
 ```
-**Remarque**: Le message d'erreur peut être affiché à l'utilisateur
 
-<br/>
+**Example:** curl https://*api-endpoint*/getInvoice
+    
+    ```
+    {
+        "success": true,
+        "message": "Invoice generated successfully.",
+        "payment_hash": "3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348",
+        "payment_request": "lnbc1u1p3u833mpp5xssdygvnvgc9p42qnq4ndcvyfrk8tpnyd0h462f7cydeqg3mkdrsdq9xycrqsp59uy0rmde2qe4kcstvgxwugnr2qxgv7pzgwh9jvhcneeaazz2uhzsxqy9gcqcqzys9qrsgqrzjqv5mk8udss3k4uhm2s3urp2dr4ejequpwmq20czjs605rskl68rzwy2ty3x9af75xyqqqqlgqqqq86qq3udg2j83nmgczshtuhy6wt6vu9zrugqugwzwdq7dd0pcneurzkfz68q8jk58khz034j8ele2jwza8meu3ecp73wp2vwzgzdj2exg3zxuqpd5rw93"
+    }
+    ```
 
-**POST - https://5apaevlc4b.execute-api.eu-west-1.amazonaws.com/getSignedUrl**
+# b. Check payment status
 
-**Définition**: Permet de vérifier si une invoice a été payée
+Used to check if an invoice has been paid
 
-**Utilisation**: doit être appelé périodiquement (5 secondes ?) par le client après la requête *getInvoice()* pour vérifier si l'invoice a été payée
-
-**Paramètres**: à ajouter en body http
+*URL*: /getSignedUrl
+*Method*: POST
+*Parameters*: JSON object with the following fields *MUST* be sent in the body of the request
 ```
 {
-    payment-hash: <payment_hash> (string)
+    payment_hash: <payment_hash> (string)
 }
 ```
-<payment_hash> : doit être le même que celui retourné par la requête getInvoice
 
-**Exemple:**
-
-> curl https://5apaevlc4b.execute-api.eu-west-1.amazonaws.com/getSignedUrl --data '{ "payment-hash": "3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348"}'
-
-> {"success":true}
-
-**Nominal** : Retourne un objet JSON avec les informations suivantes
-```
-{
-    success: true
-}
-```
-**Gestion erreur**: L'api doit retourner un code http 200 (sauf si elle plante complètement)
-```
-{
-    success: false,
-    message: <message d'erreur>
-}
-```
-**Remarque**: Le message d'erreur peut être affiché à l'utilisateur
-
-** POST - https://5apaevlc4b.execute-api.eu-west-1.amazonaws.com/checkUploadedFile
-
-**Définition**: Permet d'uploader un fichier
-
-**Utilisation**: doit être appelé par le client pour uploader un fichier
-
-**Paramètres**: A passer en entête en plus avec le fichier uploadé
-```
-{
-    payment-hash: <payment_hash> (string)
-}
-```
-<payment_hash> : doit être le même que celui retourné par la requête getInvoice
-
-
-**Exemple**
-> curl -F 'data=@bitcoin.jpg' https://5apaevlc4b.execute-api.eu-west-1.amazonaws.com/checkUploadedFile -H "payment-hash: 3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348"
-
-> {"body":"{\"statusCode\":200,\"message\":\"File Uploaded\",\"url\":\"https://d12pgnfs4nv60a.cloudfront.net/5evhgjhp8cx1673774297046ga1cxtb6ene.jpg\"}"}
-
-**Nominal** : Retourne un objet JSON avec les informations suivantes
+*Output*: JSON object with the following fields
 ```
 {
     success: true,
-    message: 'File uploaded',
-    url: <url> (string)
+    message: 'Invoice paid successfully.'
 }
 ```
-url : doit être utilisé pour fournir le lien du fichier à l'utilisateur
 
-**Gestion erreur**: L'api doit retourner un code http 200 (sauf si elle plante complètement)
+*Error*: The API must return a 200 http code (except if it completely crashes)
 ```
 {
     success: false,
-    message: <message d'erreur>
+    message: <error message>
 }
 ```
+
+**Example:** curl -X POST -H "Content-Type: application/json" -d '{"payment_hash": "3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348"}' https://*api-endpoint*/getSignedUrl
+    
+    ```
+    {
+        "success": true,
+        "message": "Invoice paid successfully."
+    }
+    ```
+
+# c. Upload file
+
+Used to upload a file to the API
+
+*URL*: /checkUploadedFile
+*Method*: POST
+*Parameters*: File *MUST* be sent as multipart upload and JSON object with the following fields *MUST* be sent in http headers
+```
+{
+    payment_hash: <payment_hash> (string)
+}
+```
+
+*Output*: JSON object with the following fields
+```
+{
+    success: true,
+    message: 'File uploaded successfully.'
+}
+```
+
+*Error*: The API must return a 200 http code (except if it completely crashes)
+```
+{
+    success: false,
+    message: <error message>
+}
+```
+
+**Example:** curl -X POST -H "payment_hash: 3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348" -F "file=@/path/to/file" https://*api-endpoint*/checkUploadedFile
+    
+    ```
+    {
+        "success": true,
+        "message": "File uploaded successfully."
+    }
+    ```
+
+
