@@ -92,8 +92,7 @@ module.exports.getInvoice = async function(event, context, callback) {
         success: true,
         message: 'Invoice generated successfully.',
         payment_hash: responseData.payment_hash,
-        payment_request: responseData.payment_request,
-        date: date
+        payment_request: responseData.payment_request
       }),
     }
   }
