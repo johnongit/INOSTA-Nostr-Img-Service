@@ -1,13 +1,21 @@
-/*
-const axios = require('axios');
-const qr = require('qrcode-terminal');
-const fs = require('fs');
-const FormData = require('form-data');
-*/
 import qr from 'qrcode-terminal';
 import fs from 'fs';
 import FormData from 'form-data';
 import axios from 'axios';
+import { createLogger, format, loggers, transports } from 'winston';
+
+const logger = createLogger({
+    level: 'info',
+    transports: [
+        new transports.Console()
+    ],
+    format: format.combine(
+        format.timestamp({
+            format: 'YYYY-MM-DD HH:mm:ss'
+        }),
+        format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+    )
+});
 
 /// Create a script that test API Gateway and Lambda function
 
@@ -116,9 +124,9 @@ async function checkUploadedFile(payment_hash ) {
 async function main() {
     // API_HOSTNAME environment variable not set then fail
     
-    console.log('run test')
+    logger.info('Run test')
     if (!process.env.API_HOSTNAME) {
-        console.log('API_HOSTNAME environment variable not set');
+        logger.error('API_HOSTNAME environment variable not set')
         return;
     }
     // call getInvoice function
@@ -129,7 +137,7 @@ async function main() {
         // convert payment_request to qr code and display it in shell
         
         qr.generate(invoice.payment_request, {  small: true });
-        console.log("payment_request: " + invoice.payment_request)
+        logger.info('payment_request: ' + invoice.payment_request)
     }
     console.log("wait for payment")
     // call each 10 second if payment is paid then upload file if payment is paid
@@ -139,14 +147,14 @@ async function main() {
         const signedUrl = await getSignedUrl(invoice.payment_hash);
         // if getSignedUrl return true, then stop interval
         if (signedUrl) {
-            console.log("payment is paid");
+            logger.info('payment is paid')
             // send bitcoin.jpg file to api
             // upload bitcoin.jpg file to api
             const uploaded = await checkUploadedFile(invoice.payment_hash);
 
             if (uploaded.status) {
-                console.log("file is uploaded");
-                console.log("Fill available at: " + uploaded.url);
+                logger.info('file is uploaded')
+                logger.info('url: ' + uploaded.url)
                 clearInterval(interval);
             }
             
