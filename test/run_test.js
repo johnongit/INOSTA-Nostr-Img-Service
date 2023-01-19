@@ -1,7 +1,13 @@
+/*
 const axios = require('axios');
 const qr = require('qrcode-terminal');
 const fs = require('fs');
 const FormData = require('form-data');
+*/
+import qr from 'qrcode-terminal';
+import fs from 'fs';
+import FormData from 'form-data';
+import axios from 'axios';
 
 /// Create a script that test API Gateway and Lambda function
 
@@ -81,8 +87,7 @@ async function checkUploadedFile(payment_hash ) {
             }
         });
         // if api return status true, then payment is paid
-
-        const bodyJson = JSON.parse(JSON.parse(response.data.body).body)
+        const bodyJson = response.data
         if (bodyJson.success) {
             return {
                 status: true,
@@ -122,7 +127,9 @@ async function main() {
     if (invoice.status) {
         // display payment_request
         // convert payment_request to qr code and display it in shell
+        
         qr.generate(invoice.payment_request, {  small: true });
+        console.log("payment_request: " + invoice.payment_request)
     }
     console.log("wait for payment")
     // call each 10 second if payment is paid then upload file if payment is paid
