@@ -1,5 +1,9 @@
-const AWS = require('aws-sdk');
-const https = require('https');
+import AWS from 'aws-sdk';
+import https from 'https';
+//const AWS = require('aws-sdk');
+//const https = require('https');
+
+
 const s3 = new AWS.S3();
 
 // DynamoDB function that write payment hash and current time to DynamoDB table
@@ -26,7 +30,8 @@ async function writePaymentHashToDynamoDB(payment_hash, date) {
 }
 
 
-module.exports.getInvoice = async function(event, context, callback) {
+
+export const getInvoice = async (event, context, callback) => {
   console.log(process.env.LNBITS_API_INVOICE_KEY)
   try {
     console.log("in try")

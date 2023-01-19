@@ -1,5 +1,9 @@
-const AWS = require('aws-sdk');
-const parser = require('lambda-multipart-parser');
+//const AWS = require('aws-sdk');
+//const parser = require('lambda-multipart-parser');
+import AWS from 'aws-sdk';
+import parser from 'lambda-multipart-parser';
+import imageType from 'image-type';
+
 
 
 async function CheckIfPaymentPaid(payment_hash) {
@@ -51,17 +55,58 @@ async function PutFileToS3(content, filename, contentType){
       }
 }
 
-// Grab 
-exports.checkUploadedFile = async function(event, context, callback) {
+
+
+// Return type 
+
+async function getFileType(content) {
+    try {
+        console.log("in getFileTyp")
+        const type = await imageType(content);
+        console.log(type)
+        if (type) {
+          return type
+        }
+        return false
+      } catch (err) {
+        console.log('Error getting file type:', err);
+        return false;
+      }
+}
+
+// Check if file is image
+
+async function isImage(content) {
+  try {
+      console.log("in isImage")
+      const type = await imageType(content);
+      console.log(type)
+      if (type) {
+        return true
+      }
+      return false
+  } catch (err) {
+    return false;
+  }
+}
+
+
+
+//exports.checkUploadedFile = async function(event, context, callback) {
+export const checkUploadedFile = async (event, context, callback) => {
   //console.log(event)
   // get headers
   const headers = event.headers;
   // get body
   const body = event.body;
   const eventParsed = await parser.parse(event);
+  console.log("headers")
   console.log(headers)
+  console.log("body")
   console.log(body)
-  console.log(headers['payment-hash'])
+
+  //console.log(headers['payment-hash'])
+  console.log("eventParsed")
   console.log(eventParsed)
 
   
@@ -87,6 +132,16 @@ exports.checkUploadedFile = async function(event, context, callback) {
   }
   // decode body from base64
   const decodedBody = Buffer.from(body, 'base64').toString();
+  // check if content type exists
+  if (!eventParsed.files[0].contentType) {
+      return {
+          statusCode: 200,
+          body: JSON.stringify({
+            success: false,
+            message: 'Missing content type'
+          })
+      }
+  }
   // set Content-Type in eventParsed 
   const contentType = eventParsed.files[0].contentType
   
@@ -106,16 +161,38 @@ exports.checkUploadedFile = async function(event, context, callback) {
 
   console.log(paymentPaid)
   if (paymentPaid) {
-      // put file to s3
-      const fileUploaded = await PutFileToS3(content, filename, contentType)
-      return {
-        body: JSON.stringify({
+      // check if file is image
+      const isImageFile = await isImage(content)
+      if (!isImageFile) {
+        console.log("not image")
+        return {
           statusCode: 200,
           body: JSON.stringify({
+            success: false,
+            message: 'File is not an image'
+          })
+        }
+      }
+
+      // put file to s3
+      const fileUploaded = await PutFileToS3(content, filename, contentType)
+      if (!fileUploaded) {
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            success: false,
+            message: 'File not uploaded'
+          })
+        }
+      }
+
+      // return success if file is uploaded
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
             success: true,
             message: 'File Uploaded',
             url: 'https://' + process.env.CLOUDFRONT_DOMAIN_NAME + '/' + filename
-          })
         })
       }
   }

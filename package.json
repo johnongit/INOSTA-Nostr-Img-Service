@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "<!-- title: 'AWS NodeJS Example' description: 'This template demonstrates how to deploy a NodeJS function running on AWS Lambda using the traditional Serverless Framework.' layout: Doc framework: v3 platform: AWS language: nodeJS priority: 1 authorLink: 'https://github.com/serverless' authorName: 'Serverless, inc.' authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4' -->",
   "main": "check_image.js",
+  "type": "module",
   "directories": {
     "test": "test"
   },
@@ -20,6 +21,9 @@
   },
   "homepage": "https://github.com/johnongit/NostrImgUploader#readme",
   "dependencies": {
+    "aws-sdk": "^2.1297.0",
+    "file-type": "^18.2.0",
+    "image-type": "^5.2.0",
     "lambda-multipart-parser": "^1.0.1",
     "qrcode-terminal": "^0.12.0"
   },

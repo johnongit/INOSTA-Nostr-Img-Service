@@ -1,6 +1,8 @@
-const AWS = require('aws-sdk');
-const https = require('https');
-const s3 = new AWS.S3();
+//const AWS = require('aws-sdk');
+//const https = require('https');
+import AWS from 'aws-sdk';
+
+//const s3 = new AWS.S3();
 
 // create a function that read in dynamoDB
 async function CheckIfPaymentPaid(payment_hash) {
@@ -51,13 +53,12 @@ async function deletePresignedUrl(payment_hash) {
     return false;
   }
 }
-
-module.exports.getPresignedUrl = async function(event, context, callback) {
-
-  
+export const getPresignedUrl = async (event, context, callback) => {
   try {
     console.log("event ")
-    //console.log(event)
+    console.log(event)
+    console.log(event.body)
+    let body = {}
     // if body is in base64, decode it
     if (event.isBase64Encoded) {
       body = Buffer.from(event.body, 'base64').toString();

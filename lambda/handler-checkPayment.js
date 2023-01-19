@@ -1,5 +1,9 @@
-const AWS = require('aws-sdk');
-const https = require('https');
+//const AWS = require('aws-sdk');
+import AWS from 'aws-sdk';
+//const https = require('https');
+
+
+
 const s3 = new AWS.S3();
 
 // create a function that read in dynamoDB and return if presigned url exists
@@ -61,8 +65,8 @@ async function updatePaymentHash(payment_hash) {
 
 
 
-module.exports.checkPayment = async function(event, context, callback) {
 
+export const checkPayment = async (event, context, callback) => {
   try {
     console.log(event)
     console.log("event " + event)
