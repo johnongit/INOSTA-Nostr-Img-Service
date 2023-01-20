@@ -20,7 +20,6 @@ const logger = createLogger({
 
 async function CheckIfPaymentPaid(payment_hash) {
   try {
-    console.log("in CheckIfPaymentPaid " + payment_hash)
     const dynamoDB = new AWS.DynamoDB.DocumentClient();
     const params = {
       TableName: process.env.DYNAMODB_TABLE,
@@ -44,6 +43,44 @@ async function CheckIfPaymentPaid(payment_hash) {
     return true;
   }
 } 
+
+// Check if payment exist and marked as paid in DynamoDB
+async function CheckIfPaymentExistAndPaid(payment_hash) {
+  try {
+    const dynamoDB = new AWS.DynamoDB.DocumentClient();
+    const params = {
+      TableName: process.env.DYNAMODB_TABLE,
+      Key: {
+        payment_hash: payment_hash
+      },
+    };
+    const data = await dynamoDB.get(params).promise();
+    if (data.Item) { 
+      if(data.Item.paid) {
+        return {
+          "exist": true,
+          "paid": true
+        }
+      }
+
+      return {
+        "exist": true,
+        "paid": false
+      }
+    }
+    return {
+      "exist": false,
+      "paid": false
+    }
+  } catch (err) {
+    logger.error('Error getting payment hash from DynamoDB:', err);
+    return {
+      "exist": false,
+      "paid": false
+    }
+  }
+}
+
 
 // Update dynamoDB and mark the invoice as paid
 async function updatePaymentHash(payment_hash) {
@@ -74,13 +111,24 @@ async function updatePaymentHash(payment_hash) {
 
 
 
-
+// webhook handler that receive payment_hash from lnbits and mark payment as paid in dynamoDB
 export const checkPayment = async (event, context, callback) => {
   try {
     const srcIp = event.requestContext.http.sourceIp
     const body = JSON.parse(event.body)
+    // if payment_hash not exist in body. prompt specific error
+    if (!body.payment_hash) {
+      logger.error("Webhook received from " + srcIp + " without payment_hash")
+      callback(null, {
+        statusCode: 400,
+        body: JSON.stringify({
+          message: 'Forbidden'
+        }),
+      });
+    }
     const payment_hash = body.payment_hash
     logger.info("Webhook received from " + srcIp + " with payment_hash " + payment_hash)
+    // check if source IP is allowed
     if (srcIp != process.env.ALLOWED_IP) {
       logger.warning(srcIp + ' no allowed to access this endpoint')
       callback(null, {
@@ -93,9 +141,57 @@ export const checkPayment = async (event, context, callback) => {
     // check if payment_hash is in dynamoDB and not marked as paid
     // Return true if payment_hash is in dynamoDB (or not :()) and marked as paid
     // should refactored :(
-    const paymentPaid = await CheckIfPaymentPaid(payment_hash)
-    logger.info("paymentPaid (false is exist and not yet paid)" + paymentPaid)
-    if (!paymentPaid) {
+    //const paymentPaid = await CheckIfPaymentPaid(payment_hash)
+    const paymentExist = await CheckIfPaymentExistAndPaid(payment_hash)
+    // if payment not exist return to used
+    if (!paymentExist.exist) {
+      logger.info("Payment hash not exist in dynamoDB " + payment_hash)
+      callback(null, {
+        statusCode: 200,
+        body: JSON.stringify({
+          message: 'Payment Hash not exist + ' + payment_hash
+        }),
+      });
+    }
+    // if payment exist and not paid
+    if (paymentExist.exist && !paymentExist.paid) {
+      logger.info("Payment hash exist in dynamoDB and not paid" + payment_hash)
+      try {
+        const updatePaymentHashResult = await updatePaymentHash(payment_hash)
+        if (updatePaymentHashResult) {
+          logger.info("Payment marked as paid in dynamoDB " + payment_hash)
+          return {
+            statusCode: 200,
+            body: JSON.stringify({
+              message: 'Payment marked as paid'
+            }),
+          }
+        }
+        logger.error("Payment not marked as paid in dynamoDB " + payment_hash)
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            message: 'Payment not marked as paid'
+          }),
+         }
+        }
+        catch (err) {
+          logger.error('Error updating payment hash in DynamoDB ' + err)
+          callback(null, {
+            statusCode: 200,
+            body: JSON.stringify({
+              message: 'Error updating payment hash in DynamoDB'
+            }),
+          });
+        }
+      }
+
+
+
+    
+    // if payment not exist or already paid
+    /*
+    if (paymentPaid) {
       // update dynamoDB and mark the invoice as paid
       logger.debug("Payment not paid, updating payment hash in DynamoDB " + payment_hash)
       const updatePaymentHashResult = await updatePaymentHash(payment_hash)
@@ -118,7 +214,8 @@ export const checkPayment = async (event, context, callback) => {
       }
   
     }
-    
+    */
+    /*
     // payment hash not in dynamoDB
     logger.info("Payment hash not in dynamoDB" + payment_hash)
     callback(null, {
@@ -127,11 +224,13 @@ export const checkPayment = async (event, context, callback) => {
         message: 'Payment Hash not exist in dynamoDB'
       }),
     });
+    */
   } catch (err) {
     logger.error('Cannot run lambda ', err);
     callback(null, {
       statusCode: 200,
       body: JSON.stringify({
+
         message: 'Error getting payment hash from DynamoDB'
       }),
     });
