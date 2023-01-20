@@ -30,7 +30,7 @@ async function writePaymentHashToDynamoDB(payment_hash, date) {
       },
     };
     const data = await dynamoDB.put(params).promise();
-    logger.info('Payment hash written to DynamoDB successfully. ' + data);
+    logger.info('Payment hash written to DynamoDB successfully ' + payment_hash);
     return true;
   } catch (err) {
     logger.error('Error writing payment hash to DynamoDB:', err);
@@ -72,7 +72,7 @@ export const getInvoice = async (event, context, callback) => {
         amount: process.env.PRICE,
         memo: 'Nostr Uploader Invoice',
         unit: 'sat',
-        webhook: process.env.WEBHOOW_URL + '/checkPayment'
+        webhook: process.env.WEBHOOW_URL + '/confirmPayment'
       };
 
       req.write(JSON.stringify(paymentData));
