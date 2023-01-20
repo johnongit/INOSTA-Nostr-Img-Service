@@ -30,6 +30,7 @@ provider:
     CLOUDFRONT_DOMAIN_NAME: ${self:custom.CLOUDFRONT_DOMAIN_NAME}
     WEBHOOW_URL: !GetAtt HttpApi.ApiEndpoint
     ALLOWED_IP: ${self:custom.ALLOWED_IP}
+    PRICE: ${self:custom.PRICE}
   iamRoleStatements: 
     - Effect: Allow
       Action:
@@ -56,6 +57,7 @@ custom:
   CLOUDFRONT_DOMAIN_NAME: ${file(./variables.yml):CLOUDFRONT_DOMAIN_NAME}
   S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
   ALLOWED_IP: ${file(./variables.yml):ALLOWED_IP}
+  PRICE: ${file(./variables.yml):PRICE}
 
 package:
   individually: true
@@ -76,7 +78,7 @@ functions:
         - lambda/handler-checkPayment.js
     events:
       - httpApi:
-          path: /checkPayment
+          path: /confirmPayment
           method: POST
   checkUploadedFile:
     handler: lambda/handler-checkUploadedFile.checkUploadedFile

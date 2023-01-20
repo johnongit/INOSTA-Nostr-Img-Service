@@ -80,11 +80,12 @@ resources:
                 - HEAD
               ViewerProtocolPolicy: redirect-to-https
       
-              
+  # create S3 bucket 
     S3Bucket:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.S3_BUCKET}
+        
     S3BucketPolicy: # Allow uploaded files to be public and downloadable
       Type: AWS::S3::BucketPolicy
       Properties:
