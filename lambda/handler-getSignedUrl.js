@@ -76,7 +76,7 @@ export const getPresignedUrl = async (event, context, callback) => {
     const payment_hash = bodyJson["payment-hash"];
     //const filename = bodyJson.filename;
     const paymentPaid = await CheckIfPaymentPaid(payment_hash)
-
+    logger.info("Receive payment status request for payment hash: " + payment_hash);
     if (paymentPaid) {
       logger.info('Payment paid for payment hash: ' + payment_hash);
       return {
