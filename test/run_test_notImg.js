@@ -4,7 +4,6 @@ import FormData from 'form-data';
 import axios from 'axios';
 import { createLogger, format, loggers, transports } from 'winston';
 
-
 const logger = createLogger({
     level: 'info',
     transports: [
@@ -17,6 +16,7 @@ const logger = createLogger({
         format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
     )
 });
+
 
 /// Create a script that test API Gateway and Lambda function
 
@@ -47,7 +47,7 @@ async function getInvoice() {
             payment_hash: ''
         }
     } catch (err) {
-        console.log('Cannot fetch /getInvoice', err);
+        logger.error('Cannot fetch /getInvoice', err);
         return {
             status: false,
             payment_request: '',
@@ -73,15 +73,15 @@ async function getSignedUrl(payment_hash) {
         return false
 
     } catch (err) {
-        console.log('Cannot fetch /getSignedUrl', err);
+        logger.error('Cannot fetch /getSignedUrl', err);
         return false
     }
 }
 
-// function that send bitcoin.jpg file /checkUploadedFile endpoint
+// function that send a fake image file /checkUploadedFile endpoint
 async function uploadFile(payment_hash ) {
     try {
-        const file = fs.readFileSync('test/bitcoin.jpg')
+        const file = fs.readFileSync('test/noImage.jpg')
         const form = new FormData();
         form.append('file', file, 'bitcoin.jpg');
         const hostname = process.env.API_HOSTNAME;
@@ -109,7 +109,7 @@ async function uploadFile(payment_hash ) {
 
     }
     catch (err) {
-        console.log('Cannot fetch /checkUploadedFile', err);
+        logger.error('Cannot fetch /checkUploadedFile', err)
         return {
             status: false,
         }
@@ -168,7 +168,10 @@ async function main() {
             if (uploaded.status) {
                 logger.info('file is uploaded')
                 logger.info('url: ' + uploaded.url)
-                clearInterval(interval);
+                break;
+            }
+            else {
+                logger.error('cannot upload file')
                 break;
             }
         }

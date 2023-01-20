@@ -4,6 +4,7 @@ import FormData from 'form-data';
 import axios from 'axios';
 import { createLogger, format, loggers, transports } from 'winston';
 
+
 const logger = createLogger({
     level: 'info',
     transports: [
@@ -16,7 +17,6 @@ const logger = createLogger({
         format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
     )
 });
-
 
 /// Create a script that test API Gateway and Lambda function
 
@@ -47,7 +47,7 @@ async function getInvoice() {
             payment_hash: ''
         }
     } catch (err) {
-        logger.error('Cannot fetch /getInvoice', err);
+        console.log('Cannot fetch /getInvoice', err);
         return {
             status: false,
             payment_request: '',
@@ -73,15 +73,15 @@ async function getSignedUrl(payment_hash) {
         return false
 
     } catch (err) {
-        logger.error('Cannot fetch /getSignedUrl', err);
+        console.log('Cannot fetch /getSignedUrl', err);
         return false
     }
 }
 
-// function that send a fake image file /checkUploadedFile endpoint
-async function checkUploadedFile(payment_hash ) {
+// function that send bitcoin.jpg file /checkUploadedFile endpoint
+async function uploadFile(payment_hash ) {
     try {
-        const file = fs.readFileSync('test/noImage.jpg')
+        const file = fs.readFileSync('test/bitcoin.jpg')
         const form = new FormData();
         form.append('file', file, 'bitcoin.jpg');
         const hostname = process.env.API_HOSTNAME;
@@ -109,7 +109,7 @@ async function checkUploadedFile(payment_hash ) {
 
     }
     catch (err) {
-        logger.error('Cannot fetch /checkUploadedFile', err)
+        console.log('Cannot fetch /checkUploadedFile', err);
         return {
             status: false,
         }
@@ -124,8 +124,10 @@ async function checkUploadedFile(payment_hash ) {
 // Create main function
 async function main() {
     // API_HOSTNAME environment variable not set then fail
+    
+    logger.info('Run test')
     if (!process.env.API_HOSTNAME) {
-        logger.error('API_HOSTNAME environment variable not set');
+        logger.error('API_HOSTNAME environment variable not set')
         return;
     }
     // call getInvoice function
@@ -136,36 +138,51 @@ async function main() {
         // convert payment_request to qr code and display it in shell
         
         qr.generate(invoice.payment_request, {  small: true });
-        logger.info("payment_request: " + invoice.payment_request)
+        logger.info('payment_request: ' + invoice.payment_request)
     }
-    console.log("wait for payment")
+    logger.info('wait for payment')
     // call each 10 second if payment is paid then upload file if payment is paid
-    
+    let paymentOk = false
     const interval = await setInterval(async () => {
+        logger.info("check payment")
+        //console.log('check payment')
         // call getSignedUrl function
         const signedUrl = await getSignedUrl(invoice.payment_hash);
         // if getSignedUrl return true, then stop interval
         if (signedUrl) {
-            logger.info("payment is paid")
-            // send bitcoin.jpg file to api
-            // upload bitcoin.jpg file to api
-            const uploaded = await checkUploadedFile(invoice.payment_hash);
-            if (uploaded.status) {
-                logger.info("file is uploaded")
-                logger.info("url: " + uploaded.url)
-                clearInterval(interval);
-            }
-            else {
-                logger.info("file is not uploaded")
-                clearInterval(interval);
-            }
-            
-
+            logger.info('payment is paid')
+            paymentOk= true
+            clearInterval(interval);
         }
     }, 10000);
-
-
-
+    // wait payment confirmation 
+    
+    while (true) {
+        // if payment is paid then upload file stop interval and break loop
+        //logger.info("in loop")
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (paymentOk) {
+            paymentOk = false
+            logger.info("payment is paid try to upload file")
+            const uploaded = await uploadFile(invoice.payment_hash);
+            if (uploaded.status) {
+                logger.info('file is uploaded')
+                logger.info('url: ' + uploaded.url)
+                
+            }
+            // try to resend file
+            const uploaded_new= await uploadFile(invoice.payment_hash);
+            if (uploaded_new.status) {
+                logger.info('file is uploaded')
+                logger.info('url: ' + uploaded_new.url)
+                break;
+            }
+            else if (uploaded_new.status == false) {
+                logger.info('file is not uploaded')
+                break;
+            }
+        }
+    }
 
     
 }

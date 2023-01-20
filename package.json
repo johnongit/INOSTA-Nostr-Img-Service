@@ -8,7 +8,9 @@
     "test": "test"
   },
   "scripts": {
-    "test": "node test/run_test.js"
+    "test": "node test/run_test.js",
+    "notImg": "node test/run_test_notImg.js",
+    "Reuse": "node test/runtest_reuse.js"
   },
   "repository": {
     "type": "git",
@@ -25,7 +27,8 @@
     "file-type": "^18.2.0",
     "image-type": "^5.2.0",
     "lambda-multipart-parser": "^1.0.1",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "winston": "^3.8.2"
   },
   "devDependencies": {
     "serverless-plugin-existing-s3": "^2.4.0"
