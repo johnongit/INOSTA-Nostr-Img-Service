@@ -1,5 +1,0 @@
-{
-    "resource": "/getInvoice",
-    "path": "/getInvoice",
-    "httpMethod": "GET"
-}  

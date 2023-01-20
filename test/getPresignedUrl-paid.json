@@ -1,8 +1,0 @@
-{
-    "routeKey": "POST /getSignedUrl",
-    "rawPath": "/getSignedUrl",
-    "rawQueryString": "",
-    "body": "eyJwYXltZW50X2hhc2giOiI2NWViYWUzMzQ2ZDhjNDRlZDJkM2I4NjU2ODI2YTA2MWU4MzRiZGI2MTY1YjMwZjY5MDRkZDU0ZTM4NWVhNTg3IiwgImZpbGVuYW1lIjogInRlc3QucG5nIn0=",
-    "isBase64Encoded": true
-  }
-  
