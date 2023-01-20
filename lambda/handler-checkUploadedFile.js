@@ -44,16 +44,19 @@ async function CheckIfPaymentPaid(payment_hash) {
 // delete entry from dynamoDB if file is uploaded
 async function deletePaymentInDb(payment_hash) {
     try {
+      logger.debug("in deletePaymentInDb " + payment_hash)
       const dynamoDB = new AWS.DynamoDB.DocumentClient();
       const params = {
         TableName: process.env.DYNAMODB_TABLE,
         Key: {
           payment_hash: payment_hash
-        },
+        }
       };
       const data = await dynamoDB.delete(params).promise();
-      console.log(data)
-      if (data.Item) {
+      logger.debug("in deletePaymentInDb " + data)
+      // data is empty if delete is successful
+      // return true if data is empty
+      if (Object.keys(data).length === 0) {
         return true
       }
       return false;
@@ -165,7 +168,7 @@ export const checkUploadedFile = async (event, context, callback) => {
   const paymentPaid = await CheckIfPaymentPaid(payment_hash)
 
   if (paymentPaid) {
-    console.log("payment paid for payment hash " + payment_hash)
+    logger.info('Payment is paid for payment hash ' + payment_hash)
       // check if file is image
       const isImageFile = await isImage(content)
       if (!isImageFile) {
