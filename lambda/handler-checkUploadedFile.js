@@ -16,11 +16,10 @@ const logger = createLogger({
     )
 });
 
-
+// Check if payment is paid in DynamoDB
 async function CheckIfPaymentPaid(payment_hash) {
     try {
-      console.log("in CheckIfPaymentPaid " + payment_hash)
-      console.log(process.env.DYNAMODB_TABLE)
+
       const dynamoDB = new AWS.DynamoDB.DocumentClient();
       const params = {
         TableName: process.env.DYNAMODB_TABLE,
@@ -29,7 +28,6 @@ async function CheckIfPaymentPaid(payment_hash) {
         },
       };
       const data = await dynamoDB.get(params).promise();
-      console.log(data)
       if (data.Item) {
         if(data.Item.paid) {
           return true
@@ -38,15 +36,35 @@ async function CheckIfPaymentPaid(payment_hash) {
       }
       return false;
     } catch (err) {
-      console.log('Error getting payment hash from DynamoDB:', err);
+      logger.error('Error getting payment hash from DynamoDB:', err);
       return true;
+    }
+}
+
+// delete entry from dynamoDB if file is uploaded
+async function deletePaymentInDb(payment_hash) {
+    try {
+      const dynamoDB = new AWS.DynamoDB.DocumentClient();
+      const params = {
+        TableName: process.env.DYNAMODB_TABLE,
+        Key: {
+          payment_hash: payment_hash
+        },
+      };
+      const data = await dynamoDB.delete(params).promise();
+      console.log(data)
+      if (data.Item) {
+        return true
+      }
+      return false;
+    } catch (err) {
+      logger.error('Error deleting presigned url from DynamoDB:', err);
+      return false;
     }
 }
 
 async function PutFileToS3(content, filename, contentType){
     try {
-        console.log("in PutFileToS3")
-        console.log(process.env.S3_BUCKET)
         const s3 = new AWS.S3();
         const params = {
             Bucket: process.env.S3_BUCKET,
@@ -55,43 +73,23 @@ async function PutFileToS3(content, filename, contentType){
             ContentType: contentType
         };
         const data = await s3.putObject(params).promise();
-        console.log(data)
         if (data) {
           return true
         }
         return false
       } catch (err) {
-        console.log('Error putting file to s3:', err);
+        logger.error('Error putting file to S3:', err);
         return false;
       }
 }
 
 
-
-// Return type 
-
-async function getFileType(content) {
-    try {
-        console.log("in getFileTyp")
-        const type = await imageType(content);
-        console.log(type)
-        if (type) {
-          return type
-        }
-        return false
-      } catch (err) {
-        console.log('Error getting file type:', err);
-        return false;
-      }
-}
 
 // Check if file is image
 
 async function isImage(content) {
   try {
-      console.log("in isImage")
       const type = await imageType(content);
-      console.log(type)
       if (type) {
         return true
       }
@@ -125,6 +123,7 @@ export const checkUploadedFile = async (event, context, callback) => {
           })
       };
   }
+  logger.info('Receive file upload request for payment hash: ' + headers['payment-hash'])
   // if body is empty
   if (!eventParsed.files) {
       logger.error('Missing body')
@@ -137,7 +136,7 @@ export const checkUploadedFile = async (event, context, callback) => {
       }
   }
   // decode body from base64
-  const decodedBody = Buffer.from(body, 'base64').toString();
+  //const decodedBody = Buffer.from(body, 'base64').toString();
   // check if content type exists
   if (!eventParsed.files[0].contentType) {
       logger.error('Missing content type')
@@ -162,7 +161,6 @@ export const checkUploadedFile = async (event, context, callback) => {
   
   const content = eventParsed.files[0].content
   const payment_hash = headers['payment-hash']
-  console.log(payment_hash)
   // Check if payment hash is paid
   const paymentPaid = await CheckIfPaymentPaid(payment_hash)
 
@@ -179,6 +177,7 @@ export const checkUploadedFile = async (event, context, callback) => {
             message: 'File is not an image'
           })
         }
+
       }
 
       // put file to s3
@@ -193,7 +192,18 @@ export const checkUploadedFile = async (event, context, callback) => {
           })
         }
       }
-
+      // delete entry from dynamoDB
+      const deleted = await deletePaymentInDb(payment_hash)
+      if (!deleted) {
+        logger.error('Payment hash not deleted from DynamoDB for payment hash ' + payment_hash)
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            success: false,
+            message: 'Cannot upload file'
+          })
+        } 
+      }
       // return success if file is uploaded
       logger.info('File uploaded for payment hash ' + payment_hash)
       return {
