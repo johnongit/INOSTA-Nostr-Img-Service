@@ -1,9 +1,20 @@
-//const AWS = require('aws-sdk');
-//const parser = require('lambda-multipart-parser');
 import AWS from 'aws-sdk';
 import parser from 'lambda-multipart-parser';
 import imageType from 'image-type';
+import { createLogger, format, loggers, transports } from 'winston';
 
+const logger = createLogger({
+    level: 'info',
+    transports: [
+        new transports.Console()
+    ],
+    format: format.combine(
+        format.timestamp({
+            format: 'YYYY-MM-DD HH:mm:ss'
+        }),
+        format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+    )
+});
 
 
 async function CheckIfPaymentPaid(payment_hash) {
@@ -100,18 +111,12 @@ export const checkUploadedFile = async (event, context, callback) => {
   // get body
   const body = event.body;
   const eventParsed = await parser.parse(event);
-  console.log("headers")
-  console.log(headers)
-  console.log("body")
-  console.log(body)
 
-  //console.log(headers['payment-hash'])
-  console.log("eventParsed")
-  console.log(eventParsed)
 
   
   // check if payment hash and date headers are present
   if (!headers['payment-hash']) {
+      logger.error('Missing payment hash header')
       return {
           statusCode: 200,
           body: JSON.stringify({
@@ -122,6 +127,7 @@ export const checkUploadedFile = async (event, context, callback) => {
   }
   // if body is empty
   if (!eventParsed.files) {
+      logger.error('Missing body')
       return {
           statusCode: 200,
           body: JSON.stringify({
@@ -134,6 +140,7 @@ export const checkUploadedFile = async (event, context, callback) => {
   const decodedBody = Buffer.from(body, 'base64').toString();
   // check if content type exists
   if (!eventParsed.files[0].contentType) {
+      logger.error('Missing content type')
       return {
           statusCode: 200,
           body: JSON.stringify({
@@ -159,12 +166,12 @@ export const checkUploadedFile = async (event, context, callback) => {
   // Check if payment hash is paid
   const paymentPaid = await CheckIfPaymentPaid(payment_hash)
 
-  console.log(paymentPaid)
   if (paymentPaid) {
+    console.log("payment paid for payment hash " + payment_hash)
       // check if file is image
       const isImageFile = await isImage(content)
       if (!isImageFile) {
-        console.log("not image")
+        logger.error('File is not an image for payment hash ' + payment_hash)
         return {
           statusCode: 200,
           body: JSON.stringify({
@@ -177,6 +184,7 @@ export const checkUploadedFile = async (event, context, callback) => {
       // put file to s3
       const fileUploaded = await PutFileToS3(content, filename, contentType)
       if (!fileUploaded) {
+        logger.error('File not uploaded for payment hash ' + payment_hash)
         return {
           statusCode: 200,
           body: JSON.stringify({
@@ -187,6 +195,7 @@ export const checkUploadedFile = async (event, context, callback) => {
       }
 
       // return success if file is uploaded
+      logger.info('File uploaded for payment hash ' + payment_hash)
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -197,6 +206,7 @@ export const checkUploadedFile = async (event, context, callback) => {
       }
   }
   else {
+    logger.error('Payment not paid for payment hash ' + payment_hash)
     return {
       statusCode: 200,
       body: JSON.stringify({

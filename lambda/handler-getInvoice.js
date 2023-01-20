@@ -1,15 +1,24 @@
 import AWS from 'aws-sdk';
 import https from 'https';
-//const AWS = require('aws-sdk');
-//const https = require('https');
+import { createLogger, format, loggers, transports } from 'winston';
 
+const logger = createLogger({
+    level: 'info',
+    transports: [
+        new transports.Console()
+    ],
+    format: format.combine(
+        format.timestamp({
+            format: 'YYYY-MM-DD HH:mm:ss'
+        }),
+        format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+    )
+});
 
 const s3 = new AWS.S3();
 
 // DynamoDB function that write payment hash and current time to DynamoDB table
 async function writePaymentHashToDynamoDB(payment_hash, date) {
-  console.log("in writePaymentHashToDynamoDB")
-  console.log(process.env.DYNAMODB_TABLE)
   try {
     const dynamoDB = new AWS.DynamoDB.DocumentClient();
     const params = {
@@ -21,10 +30,10 @@ async function writePaymentHashToDynamoDB(payment_hash, date) {
       },
     };
     const data = await dynamoDB.put(params).promise();
-    console.log('Payment hash written to DynamoDB successfully. ' + data);
+    logger.info('Payment hash written to DynamoDB successfully. ' + data);
     return true;
   } catch (err) {
-    console.log('Error writing payment hash to DynamoDB:', err);
+    logger.error('Error writing payment hash to DynamoDB:', err);
     return false;
   }
 }
@@ -34,7 +43,6 @@ async function writePaymentHashToDynamoDB(payment_hash, date) {
 export const getInvoice = async (event, context, callback) => {
   console.log(process.env.LNBITS_API_INVOICE_KEY)
   try {
-    console.log("in try")
     const options = {
       hostname: process.env.LNBITS_HOST,
       port: 443,
@@ -47,15 +55,12 @@ export const getInvoice = async (event, context, callback) => {
     }
     const requestPromise = new Promise((resolve, reject) => {
       const req = https.request(options, res => {
-        console.log('in request')
         let data = '';
         res.on('data', d => {
-          console.log("in data")
           process.stdout.write(d);
           data += d;
         });
         res.on('end', () => {
-          console.log("in end")
           resolve(data)
         })
       });
@@ -64,7 +69,7 @@ export const getInvoice = async (event, context, callback) => {
       });
       const paymentData = {
         out: false,
-        amount: 100,
+        amount: process.env.PRICE,
         memo: 'Nostr Uploader Invoice',
         unit: 'sat',
         webhook: process.env.WEBHOOW_URL + '/checkPayment'
@@ -73,16 +78,14 @@ export const getInvoice = async (event, context, callback) => {
       req.write(JSON.stringify(paymentData));
       req.end();
     });
-    console.log("before await")
     const data = await requestPromise;
     const responseData = JSON.parse(data);
     const date = new Date().toISOString();
-    console.log("response")
-    console.log(responseData);
     // write payment hash to DynamoDB
     const statusWrite = await writePaymentHashToDynamoDB(responseData.payment_hash, date);
     // return responseData to the client
     if (!statusWrite) {
+      logger.error('Error writing payment hash to DynamoDB');
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -91,6 +94,7 @@ export const getInvoice = async (event, context, callback) => {
         }),
       }
     }
+    logger.info('Invoice generated successfully for payment hash: ' + responseData.payment_hash);
     return {
       statusCode: 200,
       body: JSON.stringify({
@@ -103,7 +107,7 @@ export const getInvoice = async (event, context, callback) => {
   }
   catch (err) {
     console.log('Error getting invoice from lnbits:', err);
-    console.log(err.syscall)
+    logger.error('Error getting invoice from lnbits:', err);
     message = 'General error'
     if (err.syscall == 'getaddrinfo') {
       message = 'Cannot connect to lnbits'
