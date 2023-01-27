@@ -2,6 +2,7 @@ import AWS from 'aws-sdk';
 import parser from 'lambda-multipart-parser';
 import imageType from 'image-type';
 import { createLogger, format, loggers, transports } from 'winston';
+import crypto from 'crypto';
 
 const logger = createLogger({
     level: 'info',
@@ -104,29 +105,34 @@ async function isImage(content) {
 
 
 
-//exports.checkUploadedFile = async function(event, context, callback) {
-export const checkUploadedFile = async (event, context, callback) => {
-  //console.log(event)
+export const uploadFile = async (event, context, callback) => {
+  let callback_url = process.env.CLOUDFRONT_DOMAIN_NAME
+  logger.info(callback_url)
+  // if CF_CUSTOM_DOMAIN not empty
+  if (process.env.CF_CUSTOM_DOMAIN) {
+    callback_url = process.env.CF_CUSTOM_DOMAIN
+  }
+  logger.info(callback_url)
   // get headers
   const headers = event.headers;
   // get body
   const body = event.body;
   const eventParsed = await parser.parse(event);
-
-
-  
-  // check if payment hash and date headers are present
-  if (!headers['payment-hash']) {
-      logger.error('Missing payment hash header')
+  logger.info(event)
+  // check if "payment-hash" is in query string
+  if (!event.queryStringParameters['payment-hash']) {
+      logger.error('Missing payment hash query string')
       return {
           statusCode: 200,
           body: JSON.stringify({
               success: false,
-              message: 'Missing payment hash header'
+              message: 'Missing payment hash query string'
           })
       };
   }
-  logger.info('Receive file upload request for payment hash: ' + headers['payment-hash'])
+  const payment_hash = event.queryStringParameters['payment-hash']
+
+  logger.info('Receive file upload request for payment hash: ' + payment_hash)
   // if body is empty
   if (!eventParsed.files) {
       logger.error('Missing body')
@@ -157,13 +163,17 @@ export const checkUploadedFile = async (event, context, callback) => {
   // separate filename and extension
   const filenameSplit = eventParsed.files[0].filename.split('.')
   const extension = filenameSplit[1]
+  // return current year/month/day
+  const date = new Date().toISOString().slice(0, 10)
+  // hash filename with sha256 from date
+  const hash = crypto.createHash('sha256').update(date).digest('hex')
+
   // create filename with long random string and current timestamp
-  const filename = Math.random().toString(36).substring(2, 15) + Date.now()  + Math.random().toString(36).substring(2, 15) + '.' + extension
+  const filename = "images/" + hash + "/" + Math.random().toString(36).substring(2, 15) + Date.now()  + Math.random().toString(36).substring(2, 15) + '.' + extension
 
 
   
   const content = eventParsed.files[0].content
-  const payment_hash = headers['payment-hash']
   // Check if payment hash is paid
   const paymentPaid = await CheckIfPaymentPaid(payment_hash)
 
@@ -209,12 +219,18 @@ export const checkUploadedFile = async (event, context, callback) => {
       }
       // return success if file is uploaded
       logger.info('File uploaded for payment hash ' + payment_hash)
+      // if CF_CUSTOM_DOMAIN is set, return url with custom domain
+      // ternerary operator
+
+
+  
+
       return {
         statusCode: 200,
         body: JSON.stringify({
             success: true,
             message: 'File Uploaded',
-            url: 'https://' + process.env.CLOUDFRONT_DOMAIN_NAME + '/' + filename
+            url: 'https://' + callback_url + '/' + filename
         })
       }
   }

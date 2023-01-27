@@ -1,16 +1,3 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
 service: nostr-image-services
 
 provider:
@@ -21,13 +8,18 @@ provider:
   timeout: 29
   # HTTP Api gateway
   httpApi:
-    cors: true
+    cors:
+      allowedMethods:
+        - GET
+        - POST
+      allowedOrigins: "*"
   environment:
     S3_BUCKET: ${self:custom.S3_BUCKET}
     DYNAMODB_TABLE: ${self:service}
     LNBITS_HOST: ${self:custom.LNBITS_HOST}
     LNBITS_API_INVOICE_KEY: ${self:custom.LNBITS_API_INVOICE_KEY}
     CLOUDFRONT_DOMAIN_NAME: ${self:custom.CLOUDFRONT_DOMAIN_NAME}
+    CF_CUSTOM_DOMAIN: ${self:custom.CF_CUSTOM_DOMAIN}
     WEBHOOW_URL: !GetAtt HttpApi.ApiEndpoint
     ALLOWED_IP: ${self:custom.ALLOWED_IP}
     PRICE: ${self:custom.PRICE}
@@ -58,6 +50,7 @@ custom:
   S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
   ALLOWED_IP: ${file(./variables.yml):ALLOWED_IP}
   PRICE: ${file(./variables.yml):PRICE}
+  CF_CUSTOM_DOMAIN: ${file(./variables.yml):CF_CUSTOM_DOMAIN}
 
 package:
   individually: true
@@ -68,50 +61,54 @@ package:
 
 
 functions:
+  paymentNotification:
+    handler: lambda/paymentNotification
+    logRetentionInDays: 3
+    reservedConcurrency: 10
+    package:
+      individually: true
+      patterns:
+        - '!lambda/**'
+        - lambda/paymentNotification.js
+    events:
+      - httpApi:
+          path: /paymentNotification
+          method: POST
+  uploadFile:
+    handler: lambda/uploadFile.uploadFile
+    logRetentionInDays: 3
+    reservedConcurrency: 10
+    package:
+      individually: true
+      patterns:
+        - '!lambda/**'
+        - lambda/uploadFile.js
+    events:
+      - httpApi:
+          path: /uploadFile
+          method: POST
   checkPayment:
-    handler: lambda/handler-checkPayment.checkPayment
+    handler: lambda/checkPayment.checkPayment
     logRetentionInDays: 3
     reservedConcurrency: 10
     package:
+      individually: true
       patterns:
         - '!lambda/**'
-        - lambda/handler-checkPayment.js
+        - lambda/checkPayment.js
     events:
       - httpApi:
-          path: /confirmPayment
-          method: POST
-  checkUploadedFile:
-    handler: lambda/handler-checkUploadedFile.checkUploadedFile
-    logRetentionInDays: 3
-    reservedConcurrency: 10
-    package:
-      patterns:
-        - '!lambda/**'
-        - lambda/handler-checkUploadedFile.js
-    events: 
-      - httpApi:
-          path: /checkUploadedFile
-          method: POST
-  getPresignedUrl:
-    handler: lambda/handler-getSignedUrl.getPresignedUrl
-    logRetentionInDays: 3
-    reservedConcurrency: 10
-    package:
-      patterns:
-        - '!lambda/**'
-        - lambda/handler-getSignedUrl.js
-    events:
-      - httpApi:
-          path: /getSignedUrl
+          path: /checkPayment
           method: POST
   getInvoice:
-    handler: lambda/handler-getInvoice.getInvoice
+    handler: lambda/getInvoice.getInvoice
     logRetentionInDays: 3
     reservedConcurrency: 10
     package:
+      individually: true
       patterns:
           - '!lambda/**'
-          - lambda/handler-getInvoice.js
+          - lambda/getInvoice.js
     events: 
       - httpApi:
           path: /getInvoice
@@ -119,7 +116,6 @@ functions:
 
 resources:
   Resources:
-
     ApiGatewayStage:
       Type: AWS::ApiGatewayV2::Stage
       Properties:

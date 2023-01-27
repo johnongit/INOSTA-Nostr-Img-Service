@@ -72,13 +72,15 @@ export const getInvoice = async (event, context, callback) => {
         amount: process.env.PRICE,
         memo: 'Nostr Uploader Invoice',
         unit: 'sat',
-        webhook: process.env.WEBHOOW_URL + '/confirmPayment'
+        webhook: process.env.WEBHOOW_URL + '/paymentNotification'
       };
 
       req.write(JSON.stringify(paymentData));
       req.end();
     });
     const data = await requestPromise;
+    console.log("data")
+    console.log(data)
     const responseData = JSON.parse(data);
     const date = new Date().toISOString();
     // write payment hash to DynamoDB
@@ -95,8 +97,11 @@ export const getInvoice = async (event, context, callback) => {
       }
     }
     logger.info('Invoice generated successfully for payment hash: ' + responseData.payment_hash);
+    // return response to the client with cors headers
     return {
       statusCode: 200,
+      allowOrigin: '*',
+      allowMethods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       body: JSON.stringify({
         success: true,
         message: 'Invoice generated successfully.',

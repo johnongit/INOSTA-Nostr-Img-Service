@@ -41,27 +41,7 @@ async function CheckIfPaymentPaid(payment_hash) {
 } 
 
 
-// Create a function that delete a presigned url from dynamoDB
-async function deletePresignedUrl(payment_hash) {
-  try {
-    const dynamoDB = new AWS.DynamoDB.DocumentClient();
-    const params = {
-      TableName: process.env.DYNAMODB_TABLE,
-      Key: {
-        payment_hash: payment_hash
-      },
-    };
-    const data = await dynamoDB.delete(params).promise();
-    if (data.Item) {
-      return true
-    }
-    return false;
-  } catch (err) {
-    logger.error('Error deleting presigned url from DynamoDB:', err);
-    return false;
-  }
-}
-export const getPresignedUrl = async (event, context, callback) => {
+export const checkPayment = async (event, context, callback) => {
   try {
     let body = {}
     // if body is in base64, decode it
@@ -71,10 +51,21 @@ export const getPresignedUrl = async (event, context, callback) => {
     else {
       body = event.body;
     }
-    
+
     const bodyJson = JSON.parse(body);
+    
+    // check if payment-hash is in body
+    if (!bodyJson["payment-hash"]) {
+      logger.error('Cannot find payment-hash in body');
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: false,
+          message: 'Cannot find payment-hash in body'
+        })
+      }
+    }
     const payment_hash = bodyJson["payment-hash"];
-    //const filename = bodyJson.filename;
     const paymentPaid = await CheckIfPaymentPaid(payment_hash)
     logger.info("Receive payment status request for payment hash: " + payment_hash);
     if (paymentPaid) {

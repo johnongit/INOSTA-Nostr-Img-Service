@@ -112,7 +112,7 @@ async function updatePaymentHash(payment_hash) {
 
 
 // webhook handler that receive payment_hash from lnbits and mark payment as paid in dynamoDB
-export const checkPayment = async (event, context, callback) => {
+export const paymentNotification = async (event, context, callback) => {
   try {
     const srcIp = event.requestContext.http.sourceIp
     const body = JSON.parse(event.body)
@@ -188,43 +188,6 @@ export const checkPayment = async (event, context, callback) => {
 
 
 
-    
-    // if payment not exist or already paid
-    /*
-    if (paymentPaid) {
-      // update dynamoDB and mark the invoice as paid
-      logger.debug("Payment not paid, updating payment hash in DynamoDB " + payment_hash)
-      const updatePaymentHashResult = await updatePaymentHash(payment_hash)
-      if (updatePaymentHashResult) {
-        callback(null, {
-          statusCode: 200,
-          body: JSON.stringify({
-            message: 'Payment Paid'
-          }),
-        });
-      } else {
-        // log error
-        logger.error('Error updating payment hash in DynamoDB')
-        callback(null, {
-          statusCode: 500,
-          body: JSON.stringify({
-            message: 'Cannot update DB'
-          }),
-        });
-      }
-  
-    }
-    */
-    /*
-    // payment hash not in dynamoDB
-    logger.info("Payment hash not in dynamoDB" + payment_hash)
-    callback(null, {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: 'Payment Hash not exist in dynamoDB'
-      }),
-    });
-    */
   } catch (err) {
     logger.error('Cannot run lambda ', err);
     callback(null, {
