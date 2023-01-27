@@ -1,72 +1,88 @@
-<!--
-title: 'AWS NodeJS Example'
-description: 'This template demonstrates how to deploy a NodeJS function running on AWS Lambda using the traditional Serverless Framework.'
-layout: Doc
-framework: v3
-platform: AWS
-language: nodeJS
-priority: 1
-authorLink: 'https://github.com/serverless'
-authorName: 'Serverless, inc.'
-authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4'
--->
+# Purpose
+
+INOSTA (**I**mage and **N**ot **O**ther **S**tuff **T**ransmitted by **A**PIs) is a paid image hosting service that allows Nostr users to upload images and share them with others. Payment is done via Lightning Network.
+
+The service is a simple API that allows users to upload images and check if they have been paid. The API is a set of serverless AWS services (API gateway, Lambda functions, DynamoDB table and S3 bucket) that are deployed using the serverless framework. LNbits is used as payment processor to create invoices and check if they have been paid.
 
 
-# Serverless Framework AWS NodeJS Example
+Images are hosted on aws S3 and distributed via cloudfront.
 
-This template demonstrates how to deploy a NodeJS function running on AWS Lambda using the traditional Serverless Framework. The deployed function does not include any event definitions as well as any kind of persistence (database). For more advanced configurations check out the [examples repo](https://github.com/serverless/examples/) which includes integrations with SQS, DynamoDB or examples of functions that are triggered in `cron`-like manner. For details about configuration of specific `events`, please refer to our [documentation](https://www.serverless.com/framework/docs/providers/aws/events/).
+
+## Architecture overview
+
+![Diagram](/Docs/diagram.png)
+
+# Installation
+
+## Prerequisites
+
+- AWS account
+- AWS CLI (https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+- Serverless framework (npm install -g serverless)
+- Node.js
+- Domain name 
+- SSL certificate provided by AWS Certificate Manager (used by cloudfront)
+
+
+## Deployment
+
+In order to deploy the application, you need to run the following command:
+
+```
+git clone 
+cd inosta-paid-image-hosting
+```
+
+Copy and edit the variables in the .env file
+
+```
+cp variables.sample.yml variables.yml
+```
+
+**Variables:**
+
+* LNBITS_HOST: LNbits host
+* LNBITS_API_INVOICE_KEY: LNbits invoice api key (not admin key)
+* S3_BUCKET: S3 bucket name created after the fist cloudfront distribution deployment
+* CLOUDFRONT_DOMAIN: Cloudfront domain name created after the fist cloudfront distribution deployment
+* ALLOWED_IP: Public IP address of the lnbits server
+* Price: Service price in satoshis
+* CF_CUSTOM_DOMAIN: You custom domain name (attached to the cloudfront distribution)
+* CF_CUSTOM_DOMAIN_CERTIFICATE_ARN: The ARN of the certificate provided by AWS Certificate Manager (used by cloudfront).
+> **Note:** The certificate must be in the us-east-1 and must be **deployed before** the cloudfront distribution.
+
+
+### Deploy the cloudfront distribution
+
+This will create a cloudfront distribution and a S3 bucket. Copy the S3 bucket name and the cloudfront domain name and paste them in the variables.yml file.
+
+```
+$ sls deploy --config serverless-cloudfront.yml
+```
+> **Note:** The first deployment will take a while (around 20 minutes) because it will create the S3 bucket and the cloudfront distribution.
+
+> **Note2:** Don't forget to point your DNS (CNAME) to the cloudfront domain name.
+
+### Deploy serverless backend
+
+This command wil deploy an API gateway with four endpoints ([api definition](/Docs/endpoint.md)), four lambda functions and a dynamoDB table (used to store payment hashes).
+The command will return API endpoints fqdn and each API entry points.
+
+```
+$ sls deploy
+```
+
+
+## Test
+
+You can test the service by running test script stored in the test folder.
+
+```
+$ cd test
+$ API_HOSTNAME=<api-gw-fqdn> node run_test.js
+```
 
 ## Usage
 
-### Deployment
+As long the service is just a set of API endpoints, you can use it with any programming language. The API definitions are stored in the [endpoint.md](/Docs/endpoint.md) file.
 
-In order to deploy the example, you need to run the following command:
-
-```
-$ serverless deploy
-```
-
-After running deploy, you should see output similar to:
-
-```bash
-Deploying aws-node-project to stage dev (us-east-1)
-
-✔ Service deployed to stack aws-node-project-dev (112s)
-
-functions:
-  hello: aws-node-project-dev-hello (1.5 kB)
-```
-
-### Invocation
-
-After successful deployment, you can invoke the deployed function by using the following command:
-
-```bash
-serverless invoke --function hello
-```
-
-Which should result in response similar to the following:
-
-```json
-{
-    "statusCode": 200,
-    "body": "{\n  \"message\": \"Go Serverless v3.0! Your function executed successfully!\",\n  \"input\": {}\n}"
-}
-```
-
-### Local development
-
-You can invoke your function locally by using the following command:
-
-```bash
-serverless invoke local --function hello
-```
-
-Which should result in response similar to the following:
-
-```
-{
-    "statusCode": 200,
-    "body": "{\n  \"message\": \"Go Serverless v3.0! Your function executed successfully!\",\n  \"input\": \"\"\n}"
-}
-```

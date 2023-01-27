@@ -43,7 +43,7 @@ Used to get an invoice from the API
 
 Used to check if an invoice has been paid
 
-*URL*: /getSignedUrl
+*URL*: /checkPayment
 *Method*: POST
 *Parameters*: JSON object with the following fields *MUST* be sent in the body of the request
 ```
@@ -68,7 +68,7 @@ Used to check if an invoice has been paid
 }
 ```
 
-**Example:** curl -X POST -H "Content-Type: application/json" -d '{"payment-hash": "3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348"}' https://*api-endpoint*/getSignedUrl
+**Example:** curl -X POST -H "Content-Type: application/json" -d '{"payment-hash": "3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348"}' https://*api-endpoint*/checkPayment
     
     ```
     {
@@ -81,14 +81,14 @@ Used to check if an invoice has been paid
 
 Used to upload a file to the API
 
-*URL*: /checkUploadedFile
+*URL*: /uploadFile
 *Method*: POST
-*Parameters*: File *MUST* be sent as multipart upload and JSON object with the following fields *MUST* be sent in http headers
+*Parameters*: File *MUST* be sent as multipart upload and JSON object with the following fields *MUST* be sent in parameters
 ```
-{
-    payment-hash: <payment-hash> (string)
-}
+/uploadFile?payment-hash=<payment-hash> (string)
 ```
+```
+
 
 *Output*: JSON object with the following fields
 ```
@@ -106,13 +106,13 @@ Used to upload a file to the API
 }
 ```
 
-**Example:** curl -X POST -H "payment-hash: 3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348" -F "file=@/path/to/file" https://*api-endpoint*/checkUploadedFile
+**Example:** curl -X POST -H "payment-hash: 3420d22193623050d540982b36e18448ec7586646bef5d293ec11b90223bb348" -F "file=@/path/to/file" https://*api-endpoint*/uploadFile?payment-hash=payment-hash
     
-    ```
-    {
-        "success": true,
-        "message": "File uploaded successfully."
-    }
-    ```
+```
+{
+    "success": true,
+    "message": "File uploaded successfully."
+}
+```
 
 
