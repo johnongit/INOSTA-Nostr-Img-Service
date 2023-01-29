@@ -45,7 +45,6 @@ provider:
 custom:
   LNBITS_HOST: ${file(./variables.yml):LNBITS_HOST}
   LNBITS_API_INVOICE_KEY: ${file(./variables.yml):LNBITS_API_INVOICE_KEY}
-  DYNAMODB_TABLE: $file(./variables.yml):DYNAMODB_TABLE}
   CLOUDFRONT_DOMAIN_NAME: ${file(./variables.yml):CLOUDFRONT_DOMAIN_NAME}
   S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
   ALLOWED_IP: ${file(./variables.yml):ALLOWED_IP}
@@ -62,7 +61,7 @@ package:
 
 functions:
   paymentNotification:
-    handler: lambda/paymentNotification
+    handler: lambda/paymentNotification.paymentNotification
     logRetentionInDays: 3
     reservedConcurrency: 10
     package:
