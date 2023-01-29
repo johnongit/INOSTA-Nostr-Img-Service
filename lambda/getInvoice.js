@@ -48,6 +48,7 @@ export const getInvoice = async (event, context, callback) => {
       port: 443,
       path: '/api/v1/payments',
       method: 'POST',
+      timeout: 20000,
       headers: {
         'X-Api-Key': process.env.LNBITS_API_INVOICE_KEY,
         'Content-Type': 'application/json',
@@ -79,7 +80,17 @@ export const getInvoice = async (event, context, callback) => {
       req.end();
     });
     const data = await requestPromise;
-    console.log("data")
+    // if data is empty, return error
+    if (!data) {
+      logger.error('Error getting invoice from lnbits');
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: false,
+          message: 'Error getting invoice from lnbits'
+        }),
+      }
+    }
     console.log(data)
     const responseData = JSON.parse(data);
     const date = new Date().toISOString();
