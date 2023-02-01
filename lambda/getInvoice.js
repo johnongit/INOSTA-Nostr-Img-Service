@@ -68,12 +68,14 @@ export const getInvoice = async (event, context, callback) => {
       req.on('error', error => {
         reject(error);
       });
+      // terner if process.env.API_CUSTOM_DOMAIN is set
+      const webhook = process.env.API_CUSTOM_DOMAIN ? 'https://' + process.env.API_CUSTOM_DOMAIN + '/paymentNotification' : 'https://' + process.env.WEBHOOK_URL + '/paymentNotification';
       const paymentData = {
         out: false,
         amount: process.env.PRICE,
-        memo: 'Nostr Uploader Invoice',
+        memo: 'INOSTA Invoice',
         unit: 'sat',
-        webhook: process.env.WEBHOOW_URL + '/paymentNotification'
+        webhook: webhook
       };
 
       req.write(JSON.stringify(paymentData));

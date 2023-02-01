@@ -1,17 +1,4 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
-service: cf2-nostr-image-services
+service: cf-nostr-image-services-${sls:stage}
 
 provider:
   name: aws
@@ -19,11 +6,6 @@ provider:
   region: us-east-1
   architecture: x86_64
   timeout: 29
-  #environment:
-  #  S3_BUCKET_CF: { Ref: S3Bucket }
-  #  S3_BUCKET_CF_URL: { GetAtt: [S3Bucket, DomainName] }
-    #S3_BUCKET_CF_URL: { Ref: S3Bucket } ".s3.amazonaws.com"
-
 
 package:
   individually: true
@@ -36,43 +18,58 @@ package:
 custom:
   S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
   CF_CUSTOM_DOMAIN: ${file(./variables.yml):CF_CUSTOM_DOMAIN}
-  CF_CUSTOM_CERTIFICATE_ARN: ${file(./variables.yml):CF_CUSTOM_CERTIFICATE_ARN}
+  ROUTE53_ZONE_ID: ${file(./variables.yml):ROUTE53_ZONE_ID}
 
 resources:
   Resources:
-    CloudFrontOriginIdentity:
+    CertificateNstr:
+      Type: AWS::CertificateManager::Certificate
+      Properties:
+        DomainName: ${self:custom.CF_CUSTOM_DOMAIN}
+        ValidationMethod: DNS
+        DomainValidationOptions:
+          - DomainName: ${self:custom.CF_CUSTOM_DOMAIN}
+            HostedZoneId: ${self:custom.ROUTE53_ZONE_ID}
+    Route53Nstr:
+      Type: AWS::Route53::RecordSetGroup
+      Properties:
+        HostedZoneId: ${self:custom.ROUTE53_ZONE_ID}
+        RecordSets:
+          - Name: ${self:custom.CF_CUSTOM_DOMAIN}
+            Type: A
+            AliasTarget:
+              HostedZoneId: Z2FDTNDATAQYW2 # Cloudfront hardcoded zone id
+              DNSName: !GetAtt CloudFrontDistributionNstr.DomainName
+
+    CloudFrontOriginIdentityNstr:
       Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
       Properties:
         CloudFrontOriginAccessIdentityConfig:
           Comment: 'origin identity'
-    CloudFrontDistribution:
+    CloudFrontDistributionNstr:
       Type: AWS::CloudFront::Distribution
       Properties:
-          
           DistributionConfig:
             DefaultRootObject:  index.html
             Aliases:
               - ${self:custom.CF_CUSTOM_DOMAIN}
             ViewerCertificate:
-              AcmCertificateArn: ${self:custom.CF_CUSTOM_CERTIFICATE_ARN}
+              AcmCertificateArn: !Ref CertificateNstr
               SslSupportMethod: sni-only
               MinimumProtocolVersion: TLSv1.2_2021
             PriceClass: PriceClass_100
             Enabled: true
             Origins:
-            # PATH /
-
-              - DomainName: !GetAtt S3Bucket.DomainName
-                Id: { Ref: S3Bucket }
+              - DomainName: !GetAtt S3BucketNstr.DomainName
+                Id: { Ref: S3BucketNstr }
                 S3OriginConfig:
 
                   OriginAccessIdentity: !Join
                     - ''
                     - - origin-access-identity/cloudfront/
-                      - !Ref CloudFrontOriginIdentity
-          
+                      - !Ref CloudFrontOriginIdentityNstr
             DefaultCacheBehavior:
-              TargetOriginId: { Ref: S3Bucket }
+              TargetOriginId: { Ref: S3BucketNstr }
               CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
               ForwardedValues:
                 QueryString: false
@@ -86,7 +83,7 @@ resources:
               
             CacheBehaviors:
               - PathPattern: /images/*
-                TargetOriginId: { Ref: S3Bucket }
+                TargetOriginId: { Ref: S3BucketNstr }
                 CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
                 ForwardedValues:
                   QueryString: true
@@ -98,7 +95,7 @@ resources:
                   - OPTIONS
                 ViewerProtocolPolicy: redirect-to-https
               - PathPattern: /*
-                TargetOriginId: { Ref: S3Bucket }
+                TargetOriginId: { Ref: S3BucketNstr }
                 #CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
                 CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
                 ForwardedValues:
@@ -114,38 +111,51 @@ resources:
 
       
   # create S3 bucket 
-    S3Bucket:
+    S3BucketNstr:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.S3_BUCKET}
+        # intelligent tiering
+        IntelligentTieringConfigurations:
+          - Id: 1
+            Status: Enabled
+            Tierings:
+              - AccessTier: ARCHIVE_ACCESS
+                Days: 90
+          - Id: tier2
+            Status: Enabled
+            Tierings:
+              - AccessTier: DEEP_ARCHIVE_ACCESS
+                Days: 180
+
         
     S3BucketPolicy: # Allow uploaded files to be public and downloadable
       Type: AWS::S3::BucketPolicy
       Properties:
-        Bucket: { Ref: S3Bucket }
+        Bucket: { Ref: S3BucketNstr }
         PolicyDocument:
           Statement:
             - Action:
                 - 's3:GetObject'
               Effect: 'Allow'
-              Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3Bucket, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
+              Resource: { Fn::Join: ['', [{ Fn::GetAtt: [S3BucketNstr, Arn] }, '/*']] } # arn:aws:s3:::bucketName/*
               Principal: 
-                AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginIdentity}'
+                AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginIdentityNstr}'
   Outputs:
-    S3Bucket:
-      Value: { Ref: S3Bucket }
+    S3BucketNstr:
+      Value: { Ref: S3BucketNstr }
       Export:
-        Name: S3Bucket
-    CloudFrontDistribution:
-      Value: { Ref: CloudFrontDistribution }
+        Name: S3BucketNstr
+    CloudFrontDistributionNstr:
+      Value: { Ref: CloudFrontDistributionNstr }
       Export:
-        Name: CloudFrontDistribution
+        Name: CloudFrontDistributionNstr
       # export distribution domain name
-    CloudFrontDistributionDomainName:
-      Value: !GetAtt CloudFrontDistribution.DomainName
+    CloudFrontDistributionDomainNameNstr:
+      Value: !GetAtt CloudFrontDistributionNstr.DomainName
       Export:
-        Name: CloudFrontDistributionDomainName
-    CloudFrontOriginIdentity:
-      Value: { Ref: CloudFrontOriginIdentity }
+        Name: CloudFrontDistributionDomainNameNstr
+    CloudFrontOriginIdentityNstr:
+      Value: { Ref: CloudFrontOriginIdentityNstr }
       Export:
-        Name: CloudFrontOriginIdentity
+        Name: CloudFrontOriginIdentityNstr

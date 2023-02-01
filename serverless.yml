@@ -1,4 +1,4 @@
-service: nostr-image-services
+service: nostr-image-services-${sls:stage}
 
 provider:
   name: aws
@@ -23,6 +23,7 @@ provider:
     WEBHOOW_URL: !GetAtt HttpApi.ApiEndpoint
     ALLOWED_IP: ${self:custom.ALLOWED_IP}
     PRICE: ${self:custom.PRICE}
+    API_CUSTOM_DOMAIN: ${self:custom.API_CUSTOM_DOMAIN}
   iamRoleStatements: 
     - Effect: Allow
       Action:
@@ -39,7 +40,7 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:GetItem
         - dynamodb:DeleteItem
-      Resource: { "Fn::GetAtt": [PaymentHashTable, Arn] }
+      Resource: { "Fn::GetAtt": [PaymentHashTableNstr, Arn] }
 
 
 custom:
@@ -49,6 +50,8 @@ custom:
   S3_BUCKET: ${file(./variables.yml):S3_BUCKET}
   ALLOWED_IP: ${file(./variables.yml):ALLOWED_IP}
   PRICE: ${file(./variables.yml):PRICE}
+  API_CUSTOM_DOMAIN: ${file(./variables.yml):API_CUSTOM_DOMAIN}
+  ROUTE53_ZONE_ID: ${file(./variables.yml):ROUTE53_ZONE_ID}
   CF_CUSTOM_DOMAIN: ${file(./variables.yml):CF_CUSTOM_DOMAIN}
 
 package:
@@ -60,7 +63,7 @@ package:
 
 
 functions:
-  paymentNotification:
+  paymentNotificationNstr:
     handler: lambda/paymentNotification.paymentNotification
     logRetentionInDays: 3
     reservedConcurrency: 10
@@ -73,7 +76,7 @@ functions:
       - httpApi:
           path: /paymentNotification
           method: POST
-  uploadFile:
+  uploadFileNstr:
     handler: lambda/uploadFile.uploadFile
     logRetentionInDays: 3
     reservedConcurrency: 10
@@ -86,7 +89,7 @@ functions:
       - httpApi:
           path: /uploadFile
           method: POST
-  checkPayment:
+  checkPaymentNstr:
     handler: lambda/checkPayment.checkPayment
     logRetentionInDays: 3
     reservedConcurrency: 10
@@ -99,7 +102,7 @@ functions:
       - httpApi:
           path: /checkPayment
           method: POST
-  getInvoice:
+  getInvoiceNstr:
     handler: lambda/getInvoice.getInvoice
     logRetentionInDays: 3
     reservedConcurrency: 10
@@ -115,23 +118,19 @@ functions:
 
 resources:
   Resources:
-    ApiGatewayStage:
-      Type: AWS::ApiGatewayV2::Stage
+    CertificateApiNstr:
+      Type: AWS::CertificateManager::Certificate
       Properties:
-        StageName: $default
-        DefaultRouteSettings:
-          ThrottlingBurstLimit: 10
-          ThrottlingRateLimit: 10
-        ApiId:
-          Ref: ApiGatewayApi
-    ApiGatewayApi:
-      Type: AWS::ApiGatewayV2::Api
-      Properties:
-        Name: ${self:service}
-        ProtocolType: HTTP
+        DomainName: ${self:custom.API_CUSTOM_DOMAIN}
+        ValidationMethod: DNS
+        DomainValidationOptions:
+          - DomainName: ${self:custom.API_CUSTOM_DOMAIN}
+            HostedZoneId: ${self:custom.ROUTE53_ZONE_ID}
+
+
 
 # create dynamoDB table
-    PaymentHashTable:
+    PaymentHashTableNstr:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ${self:service}
@@ -144,4 +143,6 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
+
+
 
