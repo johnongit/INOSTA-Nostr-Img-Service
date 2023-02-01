@@ -23,6 +23,11 @@ Images are hosted on aws S3 and distributed via cloudfront.
 - Domain name 
 - SSL certificate provided by AWS Certificate Manager (used by cloudfront)
 
+## know limitations
+
+API gateway cannot handle large files (more than 10MB). Image must be resized before being uploaded to the service (around 5MB)
+
+Serverless framework cannot attach custom domain to API gateway. You need to do it manually after the first deployment.
 
 ## Deployment
 

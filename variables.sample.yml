@@ -1,8 +1,20 @@
-LNBITS_HOST: "https://legend.lnbits.com/"
+# lnbits endpoint configuration
+LNBITS_HOST: legend.lnbits.com
 LNBITS_API_INVOICE_KEY: ""
-S3_BUCKET: ""
-CLOUDFRONT_DOMAIN_NAME: ""
+# lnbits public IP address
 ALLOWED_IP: ""
 PRICE: 100
+
+# unique aws s3 bucket name (globally unique accross all aws accounts and aws customers)
+S3_BUCKET: ""
+
+# cloudfront domain name (used for hosting your own domain name and serving static frontend content
 CF_CUSTOM_DOMAIN: ""
-CF_CUSTOM_CERTIFICATE_ARN: ""
+CF_CUSTOM_ALT_DOMAIN: "inosta.cc"
+# api gateway custom domain name (used for hosting your own domain name and serving api gateway endpoints)
+API_CUSTOM_DOMAIN: "api.inosta.cc"
+
+# route53 zone id (used for creating a custom domain name for api gateway and cloudfront)
+ROUTE53_ZONE_ID: ""
+# cloudfront domain name (must be added after running serverless deploy --config serverless.cloudfront.yml)
+CLOUDFRONT_DOMAIN_NAME: "d12pgnfs4nv60a.cloudfront.net"
